@@ -1,6 +1,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+int maxTLBSize;
+int currentTLBSize = 0;
 char evictionPolicy;
 
 typedef struct

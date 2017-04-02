@@ -5,7 +5,7 @@ void printTLB(TLBElement* head)
     TLBElement* cursor = head;
     while(cursor != NULL)
     {
-        printf("Page Number: %d\n", cursor->pageNum);
+        printf("Page Number: %d\n", *cursor->pageNum);
         cursor = cursor->next;
     }
 }
@@ -23,8 +23,8 @@ TLBElement* create(int pageNum, int frameNum, TLBElement* next)
     newNode->pageNum = calloc(1, sizeof(int));
     newNode->frameNum = calloc(1, sizeof(int));
 
-    newNode->pageNum = pageNum;
-    newNode->frameNum = frameNum;
+    *newNode->pageNum = pageNum;
+    *newNode->frameNum = frameNum;
 
     newNode->next = next;
  
@@ -173,7 +173,7 @@ TLBElement* makeMostRecent(TLBElement* head, int pageNum)
     /* find the pageNum in the TLB */
     while (1)
     {
-        if (cursor->pageNum == pageNum)
+        if (*cursor->pageNum == pageNum)
         {
             break;
         }
@@ -199,11 +199,18 @@ TLBElement* makeMostRecent(TLBElement* head, int pageNum)
     }
 
     // Change the prior's next element to that of the element's next
-    priorCursor->next = cursor->next;
-    // Set the current element next to NULL
-    cursor->next = NULL;
+    if (priorCursor != NULL)
+    {
+        priorCursor->next = cursor->next;
+    }
+    else 
+    {
+        // The head must be the node being made most recent
+        head = cursor->next;
+    }
 
-    TLBElement* lastCursor = priorCursor->next;
+    TLBElement* lastCursor = cursor->next;
+
     // Get the last element of the current list
     while(1)
     {
@@ -214,16 +221,18 @@ TLBElement* makeMostRecent(TLBElement* head, int pageNum)
         lastCursor = lastCursor->next;
     }
 
+    // Set the current element next to NULL
+    cursor->next = NULL;
+
     // Set the last element to the given pageNum element
     lastCursor->next = cursor;
-
     return head;
 }
 
 TLBElement* lookupTLB(int pageNum, TLBElement* TLB)
 {
     TLBElement* cursor = TLB;
-    while(cursor->next != NULL)
+    while(cursor != NULL)
     {
         if (*cursor->pageNum == pageNum)
         {
@@ -236,6 +245,29 @@ TLBElement* lookupTLB(int pageNum, TLBElement* TLB)
 
 TLBElement* addToTLB(TLBElement* TLB, int pageNum, int frameNum)
 {
+    // First check if the current element is in the TLB
+    TLBElement* previouslyMade = lookupTLB(pageNum, TLB);
+    if (previouslyMade != NULL)
+    {
+        return TLB;
+    }
+
+    // If the max size has been reached then must evict
+    if (currentTLBSize == maxTLBSize)
+    {
+        // Remove an element from the TLB
+        if (evictionPolicy == 'f')
+        {
+            
+        }
+        else
+        {
+            TLB = removeFront(TLB);
+            currentTLBSize--;
+        }
+    }
+
+    currentTLBSize++;
     if (TLB == NULL)
     {
         return create(pageNum, frameNum, NULL);
@@ -275,8 +307,8 @@ void demoTLB()
     head = addToTLB(head, 3, 1);
     head = makeMostRecent(head, 5);
     head = addToTLB(head, 2, 1);
-    head = addToTLB(head, 1, 1);
     head = makeMostRecent(head, 9);
+    head = addToTLB(head, 1, 1);
 
     printTLB(head);
 }
@@ -284,67 +316,69 @@ void demoTLB()
 int main(int argc, char *argv[])
 {
 
-   if (argc < 8){
-  	printf("tvm379 pgsize tlbentries { g | p } quantum physpages { f | l } trace1 trace2 . . . tracen\n");
-  	exit(1);
-   }
+//    if (argc < 8){
+//   	printf("tvm379 pgsize tlbentries { g | p } quantum physpages { f | l } trace1 trace2 . . . tracen\n");
+//   	exit(1);
+//    }
 
-   int pgsize = atoi(argv[1]);
-   int tbentries = atoi(argv[2]);
-   char uniformity = argv[3];
-   int quantum = atoi(argv[4]);
-   int physpages = atoi(argv[5]);
+//    int pgsize = atoi(argv[1]);
+//     maxTLBSize = atoi(argv[2]);
+//    char uniformity = argv[3];
+//    int quantum = atoi(argv[4]);
+//    int physpages = atoi(argv[5]);
 
-    // Eviction Policy is now a global variable as it will influence the flow of the program
-    evictionPolicy = argv[6];
+//     // Eviction Policy is now a global variable as it will influence the flow of the program
+//     evictionPolicy = argv[6];
 
 
-   //command line arguments
+//    //command line arguments
 
-   int test = pgsize;
-   int test2 = tbentries;
+//    int test = pgsize;
+//    int test2 = maxTLBSize;
 
-  while (((test % 2) == 0) && test > 1)
-    test /= 2;
+//   while (((test % 2) == 0) && test > 1)
+//     test /= 2;
 
-  if ((test != 1) || (pgsize < 16) || (pgsize > 65536)){
-    printf("pgsize must be a power of 2 and between the range of 16-65536");
-    exit(1);        
-  }
+//   if ((test != 1) || (pgsize < 16) || (pgsize > 65536)){
+//     printf("pgsize must be a power of 2 and between the range of 16-65536");
+//     exit(1);        
+//   }
 
-  while (((test2 % 2) == 0) && test2 > 1)
-      test2 /= 2;
+//   while (((test2 % 2) == 0) && test2 > 1)
+//       test2 /= 2;
 
-  if ((test2 != 1) || (tbentries < 8) || (tbentries > 256)){
-    printf("tbentries must be a power of 2 and between the range of 8-256");
-    exit(1);        
-  }
+//   if ((test2 != 1) || (maxTLBSize < 8) || (maxTLBSize > 256)){
+//     printf("tlbentries must be a power of 2 and between the range of 8-256");
+//     exit(1);        
+//   }
 
-  if (uniformity == 'g')
-  {
+//   if (uniformity == 'g')
+//   {
 
-  }
-  else if (uniformity == 'p')
-  {
+//   }
+//   else if (uniformity == 'p')
+//   {
 
-  }
-  else
-  {
-    printf("Usage: Please enter g (global) or p to simulate whether the TLB distinguish across processes");   
-    exit(-1);
-  }
+//   }
+//   else
+//   {
+//     printf("Usage: Please enter g (global) or p to simulate whether the TLB distinguish across processes");   
+//     exit(-1);
+//   }
 
-  if (physpages > 1000000){
-  	printf("physpages cannot be greater than 1000000\n");
-  	exit(1);
-  }
+//   if (physpages > 1000000){
+//   	printf("physpages cannot be greater than 1000000\n");
+//   	exit(1);
+//   }
 
-  if (evictionPolicy != 'f' && evictionPolicy != 'l')
-  {
-      printf("Usage: Please enter either f(FIFO) or l (LRU), to properly define a page eviction policy.");    
-      exit(-1);
-  }
+//   if (evictionPolicy != 'f' && evictionPolicy != 'l')
+//   {
+//       printf("Usage: Please enter either f(FIFO) or l (LRU), to properly define a page eviction policy.");    
+//       exit(-1);
+//   }
 
+  maxTLBSize = 8;
+  evictionPolicy = 'l';
   demoTLB();
 
   return 0;
