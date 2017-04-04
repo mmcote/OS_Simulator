@@ -3,11 +3,15 @@
 
 int maxTLBSize;
 int currentTLBSize = 0;
-char evictionPolicy;
+char* evictionPolicy;
 
-typedef struct
+typedef struct TLBElement
 {
+    // pageNum | frameNum | PID | V/I
     int * pageNum;
     int * frameNum;
+    int * PID;
+    int * valid;
+    struct TLBElement* prev;
     struct TLBElement* next;
 } TLBElement;

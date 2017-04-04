@@ -10,8 +10,26 @@ void printTLB(TLBElement* head)
     }
 }
 
+void printTLBBackwards(TLBElement* head)
+{
+    TLBElement* cursor = head;
+    while(cursor != NULL)
+    {
+        if (cursor->next == NULL)
+        {
+            break;
+        }
+        cursor = cursor->next;
+    }
+    while(cursor != NULL)
+    {
+        printf("Page Number: %d\n", *cursor->pageNum);
+        cursor = cursor->prev;
+    }
+}
+
 // This is used originally to create the list
-TLBElement* create(int pageNum, int frameNum, TLBElement* next)
+TLBElement* create(int pageNum, int frameNum, int PID, TLBElement* prev, TLBElement* next)
 {
     TLBElement* newNode = (TLBElement*)malloc(sizeof(TLBElement));
     if(newNode == NULL)
@@ -22,10 +40,15 @@ TLBElement* create(int pageNum, int frameNum, TLBElement* next)
 
     newNode->pageNum = calloc(1, sizeof(int));
     newNode->frameNum = calloc(1, sizeof(int));
+    newNode->PID = calloc(1, sizeof(int));
+    newNode->valid = calloc(1, sizeof(int));
 
     *newNode->pageNum = pageNum;
     *newNode->frameNum = frameNum;
+    *newNode->PID = PID;
+    *newNode->valid = 1;
 
+    newNode->prev = prev;
     newNode->next = next;
  
     return newNode;
@@ -36,7 +59,7 @@ As for LRU, if this is just used once it will be the least
 recently used.
 As for FIFO, we can just grab from the head.
 */
-TLBElement* append(TLBElement* head, int pageNum, int frameNum)
+TLBElement* append(TLBElement* head, int pageNum, int frameNum, int PID)
 {
     if(head == NULL)
     {        
@@ -51,7 +74,7 @@ TLBElement* append(TLBElement* head, int pageNum, int frameNum)
     }
 
     /* create a new TLBElement */
-    TLBElement* newNode =  create(pageNum, frameNum, NULL);
+    TLBElement* newNode =  create(pageNum, frameNum, PID, cursor, NULL);
     cursor->next = newNode;
 
     return head;
@@ -63,16 +86,23 @@ in will be those residing in the front.
 */
 TLBElement* removeFront(TLBElement* head)
 {
+    // If the head is already NULL
     if(head == NULL)
     {
         return NULL;
     }
 
+    // Check if the head is the only element
     TLBElement *front = head;
+    
+    // Change the new head's previous to NULL
     head = head->next;
+    if (head != NULL)
+    {
+        head->prev = NULL;
+    }
     front->next = NULL;
-
-    /* is this the last TLBElement in the list */
+    
     if(front == head)
     {
         head = NULL;
@@ -80,17 +110,21 @@ TLBElement* removeFront(TLBElement* head)
 
     free(front->pageNum);
     free(front->frameNum);
+    free(front->PID);
+    free(front->valid);
     free(front);
     return head;
 }
 
 TLBElement* removeBack(TLBElement* head)
 {
+    // If the head is already NULL
     if(head == NULL)
     {
         return NULL;
     }
 
+    // Get the last element of the linked list
     TLBElement *cursor = head;
     TLBElement *back = NULL;
     while(cursor->next != NULL)
@@ -104,7 +138,7 @@ TLBElement* removeBack(TLBElement* head)
         back->next = NULL;
     }
 
-    /* if this is the last TLBElement in the list*/
+    // if this is the last TLBElement in the list
     if(cursor == head)
     {
         head = NULL;
@@ -112,6 +146,8 @@ TLBElement* removeBack(TLBElement* head)
 
     free(cursor->pageNum);
     free(cursor->frameNum);
+    free(cursor->PID);
+    free(cursor->valid);
     free(cursor);
 
     return head;
@@ -123,24 +159,25 @@ used which may be anywhere in the TLB.
 */
 TLBElement* removeNode(TLBElement* head,TLBElement* nd)
 {
+    // If the TLBElement passed was NULL
     if(nd == NULL)
     {
         return NULL;
     }
 
-    /* if the TLBElement is the first TLBElement */
+    // if the TLBElement is the first TLBElement
     if(nd == head)
     {
         return removeFront(head);
     }
 
-    /* if the TLBElement is the last TLBElement */
+    // if the TLBElement is the last TLBElement
     if(nd->next == NULL)
     {
         return removeBack(head);
     }
 
-    /* if the TLBElement is in the middle */
+    // if the TLBElement is in the middle
     TLBElement* cursor = head;
     while(cursor != NULL)
     {
@@ -155,7 +192,13 @@ TLBElement* removeNode(TLBElement* head,TLBElement* nd)
     {
         TLBElement* tmp = cursor->next;
         cursor->next = tmp->next;
+        cursor->prev = tmp->prev;
+        tmp->prev = NULL;
         tmp->next = NULL;
+        free(tmp->pageNum);
+        free(tmp->frameNum);
+        free(tmp->PID);
+        free(tmp->valid);
         free(tmp);
     }
     return head;
@@ -202,6 +245,7 @@ TLBElement* makeMostRecent(TLBElement* head, int pageNum)
     if (priorCursor != NULL)
     {
         priorCursor->next = cursor->next;
+        cursor->next->prev = priorCursor;
     }
     else 
     {
@@ -226,6 +270,7 @@ TLBElement* makeMostRecent(TLBElement* head, int pageNum)
 
     // Set the last element to the given pageNum element
     lastCursor->next = cursor;
+    cursor->prev = lastCursor;
     return head;
 }
 
@@ -243,7 +288,7 @@ TLBElement* lookupTLB(int pageNum, TLBElement* TLB)
     return NULL;
 }
 
-TLBElement* addToTLB(TLBElement* TLB, int pageNum, int frameNum)
+TLBElement* addToTLB(TLBElement* TLB, int pageNum, int frameNum, int PID)
 {
     // First check if the current element is in the TLB
     TLBElement* previouslyMade = lookupTLB(pageNum, TLB);
@@ -270,9 +315,9 @@ TLBElement* addToTLB(TLBElement* TLB, int pageNum, int frameNum)
     currentTLBSize++;
     if (TLB == NULL)
     {
-        return create(pageNum, frameNum, NULL);
+        return create(pageNum, frameNum, PID, NULL, NULL);
     }
-    return append(TLB, pageNum, frameNum);
+    return append(TLB, pageNum, frameNum, PID);
 }
 
 void swapLRU()
@@ -297,89 +342,147 @@ void roundRobin(int quantum, int numTraceFiles)
 
 void demoTLB()
 {
-    TLBElement* head = addToTLB(NULL, 10, 1);
-    head = addToTLB(head, 9, 1);
-    head = addToTLB(head, 8, 1);
-    head = addToTLB(head, 7, 1);
-    head = addToTLB(head, 6, 1);
-    head = addToTLB(head, 5, 1);
-    head = addToTLB(head, 4, 1);
-    head = addToTLB(head, 3, 1);
+    TLBElement* head = addToTLB(NULL, 10, 1, 1);
+    head = addToTLB(head, 9, 1, 1);
+    head = addToTLB(head, 8, 1, 1);
+    head = addToTLB(head, 7, 1, 1);
+    head = addToTLB(head, 6, 1, 1);
+    head = addToTLB(head, 5, 1, 1);
+    head = addToTLB(head, 4, 1, 1);
+    head = addToTLB(head, 3, 1, 1);
     head = makeMostRecent(head, 5);
-    head = addToTLB(head, 2, 1);
+    head = addToTLB(head, 2, 1, 1);
     head = makeMostRecent(head, 9);
-    head = addToTLB(head, 1, 1);
+    head = addToTLB(head, 1, 1, 1);
 
     printTLB(head);
+    printf("-------------------\n");
+    printTLBBackwards(head);
 }
 
-int main(int argc, char *argv[])
+int main(int argc, char **argv)
 {
+    if (argc < 8){
+        printf("tvm379 pgsize tlbentries { g | p } quantum physpages { f | l } trace1 trace2 . . . tracen\n");
+        exit(1);
+    }
 
-//    if (argc < 8){
-//   	printf("tvm379 pgsize tlbentries { g | p } quantum physpages { f | l } trace1 trace2 . . . tracen\n");
-//   	exit(1);
-//    }
+    /* If this was inputted correctly only the first 7 are not trace files,
+    the rest of the arguments are trace files
+    */
+    int numTraceFiles = argc - 7;
+    printf("numTraceFiles: %d\n", numTraceFiles);
+    int pgsize = atoi(argv[1]);
+    printf("pgsize: %d\n", pgsize);
+    maxTLBSize = atoi(argv[2]);
+    printf("maxTLBSize: %d\n", maxTLBSize);
+    char* uniformity = argv[3];
+    printf("uniformity: %s\n", uniformity);
+    int quantum = atoi(argv[4]);
+    printf("quantum: %d\n", quantum);
+    int physpages = atoi(argv[5]);
+    printf("physpages: %d\n", physpages);
 
-//    int pgsize = atoi(argv[1]);
-//     maxTLBSize = atoi(argv[2]);
-//    char uniformity = argv[3];
-//    int quantum = atoi(argv[4]);
-//    int physpages = atoi(argv[5]);
+    /* Eviction Policy is now a global variable as it will influence the flow 
+    of the program
+    */
+    evictionPolicy = calloc(2, sizeof(char));
+    evictionPolicy = argv[6];
+    printf("evictionPolicy: %s\n", evictionPolicy);
 
-//     // Eviction Policy is now a global variable as it will influence the flow of the program
-//     evictionPolicy = argv[6];
+    //command line arguments, powers of 2
+    int test = pgsize;
+    int test2 = maxTLBSize;
+
+    while (((test % 2) == 0) && test > 1)
+        test /= 2;
+
+    if ((test != 1) || (pgsize < 16) || (pgsize > 65536))
+    {
+        printf("pgsize must be a power of 2 and between the range of 16-65536");
+        exit(1);        
+    }
+
+    while (((test2 % 2) == 0) && test2 > 1)
+        test2 /= 2;
+
+    if ((test2 != 1) || (maxTLBSize < 8) || (maxTLBSize > 256))
+    {
+        printf("tlbentries must be a power of 2 and between the range of 8-256");
+        exit(1);        
+    }
+
+    if (*uniformity != 'g' && *uniformity != 'p')
+    {
+        printf("Usage: Please enter g (global) or p to simulate whether the TLB distinguish across processes");   
+        exit(-1);
+    }
+
+    if (quantum <= 0)
+    {
+        printf("Usage: Quantum must be greater than zero.");		
+        exit(-1);
+    }
+
+    if (physpages > 1000000){
+        printf("physpages cannot be greater than 1000000\n");
+        exit(1);
+    }
+
+    if (*evictionPolicy != 'f' && *evictionPolicy != 'l')
+    {
+        printf("Usage: Please enter either f(FIFO) or l (LRU), to properly define a page eviction policy.");    
+        exit(-1);
+    }
+    
+    FILE* fp[numTraceFiles];
+    off_t offset[numTraceFiles];
+    char* fileName;
+    for (int i = 0; i < numTraceFiles; ++i)
+    {
+        fp[i] = NULL;
+        fileName = argv[i + 7];
+        fp[i] = fopen(fileName, "rb");
+    }
 
 
-//    //command line arguments
+    char* buffer;
+    // allocate memory to contain the whole file:
+    buffer = (char*) calloc((quantum*4) + 1, sizeof(char));
+    if (buffer == NULL) {fputs ("Memory error",stderr); exit (2);}
 
-//    int test = pgsize;
-//    int test2 = maxTLBSize;
+    // Round Robin, loop till all files are empty
+    int allEmpty = 1;
+    int index = 0;
+    int readReturn = 0;
+    while(1)
+    {
+        readReturn = fread(buffer,1,(quantum*4),fp[index]);
+        // readReturn = read(fp[index], buffer, (quantum*4)); 
+        if (readReturn != 0)
+        {
+            allEmpty = 0;
+        }
 
-//   while (((test % 2) == 0) && test > 1)
-//     test /= 2;
+        printf("Buffer: %s\n", buffer);
+        bzero(buffer, (quantum*4));
+        if (index == (numTraceFiles - 1) && allEmpty == 1)
+        {
+            break;
+        }
 
-//   if ((test != 1) || (pgsize < 16) || (pgsize > 65536)){
-//     printf("pgsize must be a power of 2 and between the range of 16-65536");
-//     exit(1);        
-//   }
+        if (index == (numTraceFiles - 1))
+        {
+            allEmpty = 1;
+            index = 0;
+            continue;
+        }
+        index++;
+    }
+    // run(fp, uniform);
+    // maxTLBSize = 8;
+    // evictionPolicy = 'l';
+    // demoTLB();
 
-//   while (((test2 % 2) == 0) && test2 > 1)
-//       test2 /= 2;
-
-//   if ((test2 != 1) || (maxTLBSize < 8) || (maxTLBSize > 256)){
-//     printf("tlbentries must be a power of 2 and between the range of 8-256");
-//     exit(1);        
-//   }
-
-//   if (uniformity == 'g')
-//   {
-
-//   }
-//   else if (uniformity == 'p')
-//   {
-
-//   }
-//   else
-//   {
-//     printf("Usage: Please enter g (global) or p to simulate whether the TLB distinguish across processes");   
-//     exit(-1);
-//   }
-
-//   if (physpages > 1000000){
-//   	printf("physpages cannot be greater than 1000000\n");
-//   	exit(1);
-//   }
-
-//   if (evictionPolicy != 'f' && evictionPolicy != 'l')
-//   {
-//       printf("Usage: Please enter either f(FIFO) or l (LRU), to properly define a page eviction policy.");    
-//       exit(-1);
-//   }
-
-  maxTLBSize = 8;
-  evictionPolicy = 'l';
-  demoTLB();
-
-  return 0;
+    return 0;
 }
