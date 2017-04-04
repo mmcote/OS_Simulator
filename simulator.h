@@ -15,3 +15,5 @@ typedef struct TLBElement
     struct TLBElement* prev;
     struct TLBElement* next;
 } TLBElement;
+
+TLBElement* TLB;

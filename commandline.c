@@ -208,7 +208,7 @@ TLBElement* removeNode(TLBElement* head,TLBElement* nd)
 In this case making the page the most recent involves bringing the element to 
 back of the list.
 */
-TLBElement* makeMostRecent(TLBElement* head, int pageNum)
+TLBElement* makeMostRecent(TLBElement* head, int pageNum, int PID)
 {
     TLBElement* priorCursor = NULL;
     TLBElement* cursor = head;
@@ -216,7 +216,7 @@ TLBElement* makeMostRecent(TLBElement* head, int pageNum)
     /* find the pageNum in the TLB */
     while (1)
     {
-        if (*cursor->pageNum == pageNum)
+        if (*cursor->pageNum == pageNum && *cursor->PID == PID)
         {
             break;
         }
@@ -274,12 +274,12 @@ TLBElement* makeMostRecent(TLBElement* head, int pageNum)
     return head;
 }
 
-TLBElement* lookupTLB(int pageNum, TLBElement* TLB)
+TLBElement* lookupTLB(int pageNum, int PID, TLBElement* TLB)
 {
     TLBElement* cursor = TLB;
     while(cursor != NULL)
     {
-        if (*cursor->pageNum == pageNum)
+        if (*cursor->pageNum == pageNum && *cursor->PID == PID)
         {
             return cursor;
         }
@@ -288,10 +288,20 @@ TLBElement* lookupTLB(int pageNum, TLBElement* TLB)
     return NULL;
 }
 
+TLBElement* TLBHitOrMiss(TLBElement* TLB, int pageNum, int PID)
+{
+    TLBElement* previouslyMade = lookupTLB(pageNum, PID, TLB);
+    if (previouslyMade != NULL)
+    {
+        return TLB;
+    }
+    return NULL;
+}
+
 TLBElement* addToTLB(TLBElement* TLB, int pageNum, int frameNum, int PID)
 {
     // First check if the current element is in the TLB
-    TLBElement* previouslyMade = lookupTLB(pageNum, TLB);
+    TLBElement* previouslyMade = lookupTLB(pageNum, PID, TLB);
     if (previouslyMade != NULL)
     {
         return TLB;
@@ -320,24 +330,62 @@ TLBElement* addToTLB(TLBElement* TLB, int pageNum, int frameNum, int PID)
     return append(TLB, pageNum, frameNum, PID);
 }
 
-void swapLRU()
+void processQuantum(unsigned char* buffer, int quantum, int PID)
 {
+    unsigned char* currentLocation = buffer;
+    unsigned char* miniBuffer = calloc(5, sizeof(char));
+    
+    int pageNum;
 
-}
+    int hits = 0;
+    int checks = 0;
+    // Process whole quantum
+    // TODO: change limit back to quantum
+    // for (int i = 0; i < quantum; ++i)
+    for (int i = 0; i < quantum; ++i)
+    {
+        pageNum = 0;
+        for (int j = 0; j < 4; ++j)
+        {
+            miniBuffer[j] = *currentLocation;
+            currentLocation++;
 
-void swapFIFO()
-{
+            for (int k = 0; k < 8; ++k) {
+                // printf("%d", !!((miniBuffer[j] << k) & 0x80));
+                if ( (!!((miniBuffer[j] << k) & 0x80)) == 1)
+                {
+                    pageNum |= 1 << ((32 - j*8 - 1) - k);
+                }
+            }
 
-}
+            // for (int k = 0; k < 8; ++k) {
+            //     printf("%d", !!((miniBuffer[j] << k) & 0x80));
+            // }
+        }
+        
+        // printf("pageNum: %d\n", pageNum);
+        // printf("\n");
+        // printf("pageNum: %d\n", pageNum);
 
-void takeIn()
-{
-
-}
-
-void roundRobin(int quantum, int numTraceFiles)
-{
-
+        TLBElement* hit = TLBHitOrMiss(TLB, pageNum, PID);
+        checks++;
+        /* If there is a TLB hit then continue, although before continuing:
+            - If the eviction policy is LRU --> make the TLBElement the most recent one
+        */
+        if (hit != NULL)
+        {
+            hits++;
+            // printf("Hit for %d\n", pageNum);
+            // printTLB(TLB);
+            TLB = makeMostRecent(TLB, pageNum, PID);
+            continue;
+        }
+        else
+        {
+            TLB = addToTLB(TLB, pageNum, 1, PID);
+        }
+    }
+    printf("Hit/Checks %d/%d\n", hits, checks);
 }
 
 void demoTLB()
@@ -350,9 +398,9 @@ void demoTLB()
     head = addToTLB(head, 5, 1, 1);
     head = addToTLB(head, 4, 1, 1);
     head = addToTLB(head, 3, 1, 1);
-    head = makeMostRecent(head, 5);
+    head = makeMostRecent(head, 5, 1);
     head = addToTLB(head, 2, 1, 1);
-    head = makeMostRecent(head, 9);
+    head = makeMostRecent(head, 9, 1);
     head = addToTLB(head, 1, 1, 1);
 
     printTLB(head);
@@ -362,93 +410,96 @@ void demoTLB()
 
 int main(int argc, char **argv)
 {
-    if (argc < 8){
-        printf("tvm379 pgsize tlbentries { g | p } quantum physpages { f | l } trace1 trace2 . . . tracen\n");
-        exit(1);
-    }
-
-    /* If this was inputted correctly only the first 7 are not trace files,
-    the rest of the arguments are trace files
-    */
-    int numTraceFiles = argc - 7;
-    printf("numTraceFiles: %d\n", numTraceFiles);
-    int pgsize = atoi(argv[1]);
-    printf("pgsize: %d\n", pgsize);
-    maxTLBSize = atoi(argv[2]);
-    printf("maxTLBSize: %d\n", maxTLBSize);
-    char* uniformity = argv[3];
-    printf("uniformity: %s\n", uniformity);
-    int quantum = atoi(argv[4]);
-    printf("quantum: %d\n", quantum);
-    int physpages = atoi(argv[5]);
-    printf("physpages: %d\n", physpages);
-
-    /* Eviction Policy is now a global variable as it will influence the flow 
-    of the program
-    */
-    evictionPolicy = calloc(2, sizeof(char));
-    evictionPolicy = argv[6];
-    printf("evictionPolicy: %s\n", evictionPolicy);
-
-    //command line arguments, powers of 2
-    int test = pgsize;
-    int test2 = maxTLBSize;
-
-    while (((test % 2) == 0) && test > 1)
-        test /= 2;
-
-    if ((test != 1) || (pgsize < 16) || (pgsize > 65536))
+    // #Checks
     {
-        printf("pgsize must be a power of 2 and between the range of 16-65536");
-        exit(1);        
+        if (argc < 8){
+            printf("tvm379 pgsize tlbentries { g | p } quantum physpages { f | l } trace1 trace2 . . . tracen\n");
+            exit(1);
+        }
+
+        /* If this was inputted correctly only the first 7 are not trace files,
+        the rest of the arguments are trace files
+        */
+        int numTraceFiles = argc - 7;
+        int pgsize = atoi(argv[1]);
+        maxTLBSize = atoi(argv[2]);
+        char* uniformity = argv[3];
+        int quantum = atoi(argv[4]);
+        int physpages = atoi(argv[5]);
+
+        /* Eviction Policy is now a global variable as it will influence the flow 
+        of the program
+        */
+        evictionPolicy = calloc(2, sizeof(char));
+        evictionPolicy = argv[6];
+
+        //command line arguments, powers of 2
+        int test = pgsize;
+        int test2 = maxTLBSize;
+
+        while (((test % 2) == 0) && test > 1)
+            test /= 2;
+
+        if ((test != 1) || (pgsize < 16) || (pgsize > 65536))
+        {
+            printf("pgsize must be a power of 2 and between the range of 16-65536");
+            exit(1);        
+        }
+
+        while (((test2 % 2) == 0) && test2 > 1)
+            test2 /= 2;
+
+        if ((test2 != 1) || (maxTLBSize < 8) || (maxTLBSize > 256))
+        {
+            printf("tlbentries must be a power of 2 and between the range of 8-256");
+            exit(1);        
+        }
+
+        if (*uniformity != 'g' && *uniformity != 'p')
+        {
+            printf("Usage: Please enter g (global) or p to simulate whether the TLB distinguish across processes");   
+            exit(-1);
+        }
+
+        if (quantum <= 0)
+        {
+            printf("Usage: Quantum must be greater than zero.");		
+            exit(-1);
+        }
+
+        if (physpages > 1000000){
+            printf("physpages cannot be greater than 1000000\n");
+            exit(1);
+        }
+
+        if (*evictionPolicy != 'f' && *evictionPolicy != 'l')
+        {
+            printf("Usage: Please enter either f(FIFO) or l (LRU), to properly define a page eviction policy.");    
+            exit(-1);
+        }
+
+        FILE* fp[numTraceFiles];
+        off_t offset[numTraceFiles];
+        char* fileName;
+        for (int i = 0; i < numTraceFiles; ++i)
+        {
+            fp[i] = NULL;
+            fileName = argv[i + 7];
+            fp[i] = fopen(fileName, "rb");
+        }
     }
 
-    while (((test2 % 2) == 0) && test2 > 1)
-        test2 /= 2;
+    // Initialize the TLB
+    TLB = NULL;
 
-    if ((test2 != 1) || (maxTLBSize < 8) || (maxTLBSize > 256))
-    {
-        printf("tlbentries must be a power of 2 and between the range of 8-256");
-        exit(1);        
-    }
+    // Initialize the Virtual Memory
+    VM = NULL;
 
-    if (*uniformity != 'g' && *uniformity != 'p')
-    {
-        printf("Usage: Please enter g (global) or p to simulate whether the TLB distinguish across processes");   
-        exit(-1);
-    }
+    // Initialize the Page Tables for all processes
 
-    if (quantum <= 0)
-    {
-        printf("Usage: Quantum must be greater than zero.");		
-        exit(-1);
-    }
-
-    if (physpages > 1000000){
-        printf("physpages cannot be greater than 1000000\n");
-        exit(1);
-    }
-
-    if (*evictionPolicy != 'f' && *evictionPolicy != 'l')
-    {
-        printf("Usage: Please enter either f(FIFO) or l (LRU), to properly define a page eviction policy.");    
-        exit(-1);
-    }
-    
-    FILE* fp[numTraceFiles];
-    off_t offset[numTraceFiles];
-    char* fileName;
-    for (int i = 0; i < numTraceFiles; ++i)
-    {
-        fp[i] = NULL;
-        fileName = argv[i + 7];
-        fp[i] = fopen(fileName, "rb");
-    }
-
-
-    char* buffer;
+    unsigned char* buffer;
     // allocate memory to contain the whole file:
-    buffer = (char*) calloc((quantum*4) + 1, sizeof(char));
+    buffer = (unsigned char*) calloc((quantum*4) + 1, sizeof(char));
     if (buffer == NULL) {fputs ("Memory error",stderr); exit (2);}
 
     // Round Robin, loop till all files are empty
@@ -462,10 +513,15 @@ int main(int argc, char **argv)
         if (readReturn != 0)
         {
             allEmpty = 0;
+            /* In this assignment the process is simulated by the tracefile,
+            hence the processId can be simulated by the index of the trace file.
+            */
+            processQuantum(buffer, quantum, index);
         }
 
-        printf("Buffer: %s\n", buffer);
-        bzero(buffer, (quantum*4));
+        // printf("Buffer: %s\n", buffer);
+        // bzero(buffer, (quantum*4));
+
         if (index == (numTraceFiles - 1) && allEmpty == 1)
         {
             break;
@@ -479,7 +535,7 @@ int main(int argc, char **argv)
         }
         index++;
     }
-    // run(fp, uniform);
+
     // maxTLBSize = 8;
     // evictionPolicy = 'l';
     // demoTLB();
