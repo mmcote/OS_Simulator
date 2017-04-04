@@ -1,8 +1,8 @@
 #include "simulator.h"
 
-void printTLB(TLBElement* head)
+void printTLB(DLLElement* head)
 {
-    TLBElement* cursor = head;
+    DLLElement* cursor = head;
     while(cursor != NULL)
     {
         printf("Page Number: %d\n", *cursor->pageNum);
@@ -10,9 +10,9 @@ void printTLB(TLBElement* head)
     }
 }
 
-void printTLBBackwards(TLBElement* head)
+void printTLBBackwards(DLLElement* head)
 {
-    TLBElement* cursor = head;
+    DLLElement* cursor = head;
     while(cursor != NULL)
     {
         if (cursor->next == NULL)
@@ -29,9 +29,9 @@ void printTLBBackwards(TLBElement* head)
 }
 
 // This is used originally to create the list
-TLBElement* create(int pageNum, int frameNum, int PID, TLBElement* prev, TLBElement* next)
+DLLElement* create(int pageNum, int frameNum, int PID, DLLElement* prev, DLLElement* next)
 {
-    TLBElement* newNode = (TLBElement*)malloc(sizeof(TLBElement));
+    DLLElement* newNode = (DLLElement*)malloc(sizeof(DLLElement));
     if(newNode == NULL)
     {
         printf("Error creating a new node.\n");
@@ -59,22 +59,22 @@ As for LRU, if this is just used once it will be the least
 recently used.
 As for FIFO, we can just grab from the head.
 */
-TLBElement* append(TLBElement* head, int pageNum, int frameNum, int PID)
+DLLElement* append(DLLElement* head, int pageNum, int frameNum, int PID)
 {
     if(head == NULL)
     {        
         return NULL;
     }
 
-    /* go to the last TLBElement */
-    TLBElement *cursor = head;
+    /* go to the last DLLElement */
+    DLLElement *cursor = head;
     while(cursor->next != NULL)
     {
         cursor = cursor->next;
     }
 
-    /* create a new TLBElement */
-    TLBElement* newNode =  create(pageNum, frameNum, PID, cursor, NULL);
+    /* create a new DLLElement */
+    DLLElement* newNode =  create(pageNum, frameNum, PID, cursor, NULL);
     cursor->next = newNode;
 
     return head;
@@ -84,7 +84,7 @@ TLBElement* append(TLBElement* head, int pageNum, int frameNum, int PID)
 elements being inserted will just be added to the back and therefore the first
 in will be those residing in the front.
 */
-TLBElement* removeFront(TLBElement* head)
+DLLElement* removeFront(DLLElement* head)
 {
     // If the head is already NULL
     if(head == NULL)
@@ -93,7 +93,7 @@ TLBElement* removeFront(TLBElement* head)
     }
 
     // Check if the head is the only element
-    TLBElement *front = head;
+    DLLElement *front = head;
     
     // Change the new head's previous to NULL
     head = head->next;
@@ -116,7 +116,7 @@ TLBElement* removeFront(TLBElement* head)
     return head;
 }
 
-TLBElement* removeBack(TLBElement* head)
+DLLElement* removeBack(DLLElement* head)
 {
     // If the head is already NULL
     if(head == NULL)
@@ -125,8 +125,8 @@ TLBElement* removeBack(TLBElement* head)
     }
 
     // Get the last element of the linked list
-    TLBElement *cursor = head;
-    TLBElement *back = NULL;
+    DLLElement *cursor = head;
+    DLLElement *back = NULL;
     while(cursor->next != NULL)
     {
         back = cursor;
@@ -138,7 +138,7 @@ TLBElement* removeBack(TLBElement* head)
         back->next = NULL;
     }
 
-    // if this is the last TLBElement in the list
+    // if this is the last DLLElement in the list
     if(cursor == head)
     {
         head = NULL;
@@ -153,32 +153,32 @@ TLBElement* removeBack(TLBElement* head)
     return head;
 }
 
-/* removeNode TLBElement from the anywhere in the TLB will be used especially 
+/* removeNode DLLElement from the anywhere in the TLB will be used especially 
 in the LRU eviction policy as we will always be removing the least recently 
 used which may be anywhere in the TLB.
 */
-TLBElement* removeNode(TLBElement* head,TLBElement* nd)
+DLLElement* removeNode(DLLElement* head,DLLElement* nd)
 {
-    // If the TLBElement passed was NULL
+    // If the DLLElement passed was NULL
     if(nd == NULL)
     {
         return NULL;
     }
 
-    // if the TLBElement is the first TLBElement
+    // if the DLLElement is the first DLLElement
     if(nd == head)
     {
         return removeFront(head);
     }
 
-    // if the TLBElement is the last TLBElement
+    // if the DLLElement is the last DLLElement
     if(nd->next == NULL)
     {
         return removeBack(head);
     }
 
-    // if the TLBElement is in the middle
-    TLBElement* cursor = head;
+    // if the DLLElement is in the middle
+    DLLElement* cursor = head;
     while(cursor != NULL)
     {
         if(cursor->next == nd)
@@ -190,7 +190,7 @@ TLBElement* removeNode(TLBElement* head,TLBElement* nd)
 
     if(cursor != NULL)
     {
-        TLBElement* tmp = cursor->next;
+        DLLElement* tmp = cursor->next;
         cursor->next = tmp->next;
         cursor->prev = tmp->prev;
         tmp->prev = NULL;
@@ -208,10 +208,10 @@ TLBElement* removeNode(TLBElement* head,TLBElement* nd)
 In this case making the page the most recent involves bringing the element to 
 back of the list.
 */
-TLBElement* makeMostRecent(TLBElement* head, int pageNum, int PID)
+DLLElement* makeMostRecent(DLLElement* head, int pageNum, int PID)
 {
-    TLBElement* priorCursor = NULL;
-    TLBElement* cursor = head;
+    DLLElement* priorCursor = NULL;
+    DLLElement* cursor = head;
 
     /* find the pageNum in the TLB */
     while (1)
@@ -253,7 +253,7 @@ TLBElement* makeMostRecent(TLBElement* head, int pageNum, int PID)
         head = cursor->next;
     }
 
-    TLBElement* lastCursor = cursor->next;
+    DLLElement* lastCursor = cursor->next;
 
     // Get the last element of the current list
     while(1)
@@ -274,9 +274,29 @@ TLBElement* makeMostRecent(TLBElement* head, int pageNum, int PID)
     return head;
 }
 
-TLBElement* lookupTLB(int pageNum, int PID, TLBElement* TLB)
+/* pageTableHitOrMiss is used to check whether the DLLElement belongs to the 
+corresponding pageTable.
+*/
+DLLElement* pageTableHitOrMiss(int pageNum, int PID, DLLElement* TLB)
 {
-    TLBElement* cursor = TLB;
+    DLLElement* cursor = TLB;
+    while(cursor != NULL)
+    {
+        if (*cursor->pageNum == pageNum)
+        {
+            return cursor;
+        }
+        cursor = cursor->next;
+    }
+    return NULL;
+}
+
+/* TLBHitOrMiss is used to check whether the DLLElement belongs to the current
+TLB state.
+*/
+DLLElement* TLBHitOrMiss(int pageNum, int PID, DLLElement* TLB)
+{
+    DLLElement* cursor = TLB;
     while(cursor != NULL)
     {
         if (*cursor->pageNum == pageNum && *cursor->PID == PID)
@@ -288,62 +308,55 @@ TLBElement* lookupTLB(int pageNum, int PID, TLBElement* TLB)
     return NULL;
 }
 
-TLBElement* TLBHitOrMiss(TLBElement* TLB, int pageNum, int PID)
-{
-    TLBElement* previouslyMade = lookupTLB(pageNum, PID, TLB);
-    if (previouslyMade != NULL)
-    {
-        return TLB;
-    }
-    return NULL;
-}
-
-TLBElement* addToTLB(TLBElement* TLB, int pageNum, int frameNum, int PID)
-{
-    // First check if the current element is in the TLB
-    TLBElement* previouslyMade = lookupTLB(pageNum, PID, TLB);
-    if (previouslyMade != NULL)
-    {
-        return TLB;
-    }
-
+DLLElement* addToDLL(
+    DLLElement* DLL, int pageNum, int frameNum, int PID,
+    int* currentSize, int maxSize)
+{  
     // If the max size has been reached then must evict
-    if (currentTLBSize == maxTLBSize)
+    // currentSize will be NULL when the size does not matter.
+    if (currentSize != NULL && *currentSize == maxSize)
     {
-        // Remove an element from the TLB
-        if (evictionPolicy == 'f')
-        {
-            
-        }
-        else
-        {
-            TLB = removeFront(TLB);
-            currentTLBSize--;
-        }
+        /* Remove an element from the TLB, independent of the
+        eviction policy here, that is handled elsewhere, here
+        we just remove
+        */
+        DLL = removeFront(DLL);
+        *currentSize -= 1;
     }
 
-    currentTLBSize++;
-    if (TLB == NULL)
+    if (currentSize != NULL)
+    {
+        *currentSize += 1;
+    }
+
+    if (DLL == NULL)
     {
         return create(pageNum, frameNum, PID, NULL, NULL);
     }
-    return append(TLB, pageNum, frameNum, PID);
+    return append(DLL, pageNum, frameNum, PID);
 }
 
-void processQuantum(unsigned char* buffer, int quantum, int PID)
+int processQuantum(unsigned char* buffer, int quantum, int PID, DLLElement* pageTable)
 {
     unsigned char* currentLocation = buffer;
     unsigned char* miniBuffer = calloc(5, sizeof(char));
     
-    int pageNum;
+    unsigned int pageNum;
+    unsigned int frameNum;
 
-    int hits = 0;
-    int checks = 0;
+    unsigned int hits = 0;
+    unsigned int checks = 0;
+
+    int addToPT;
+    int addToVM;
+
     // Process whole quantum
     // TODO: change limit back to quantum
     // for (int i = 0; i < quantum; ++i)
     for (int i = 0; i < quantum; ++i)
     {
+        addToVM = 1;
+        addToPT = 1;
         pageNum = 0;
         for (int j = 0; j < 4; ++j)
         {
@@ -351,142 +364,150 @@ void processQuantum(unsigned char* buffer, int quantum, int PID)
             currentLocation++;
 
             for (int k = 0; k < 8; ++k) {
-                // printf("%d", !!((miniBuffer[j] << k) & 0x80));
                 if ( (!!((miniBuffer[j] << k) & 0x80)) == 1)
                 {
                     pageNum |= 1 << ((32 - j*8 - 1) - k);
                 }
             }
-
-            // for (int k = 0; k < 8; ++k) {
-            //     printf("%d", !!((miniBuffer[j] << k) & 0x80));
-            // }
         }
-        
-        // printf("pageNum: %d\n", pageNum);
-        // printf("\n");
-        // printf("pageNum: %d\n", pageNum);
-
-        TLBElement* hit = TLBHitOrMiss(TLB, pageNum, PID);
+        // printf("Checking TLB Hit\n");
+        DLLElement* TLBHit = TLBHitOrMiss(pageNum, PID, TLB);
         checks++;
         /* If there is a TLB hit then continue, although before continuing:
-            - If the eviction policy is LRU --> make the TLBElement the most recent one
+            - If the eviction policy is LRU --> make the DLLElement the most recent one
         */
-        if (hit != NULL)
+        if (TLBHit != NULL)
         {
             hits++;
-            // printf("Hit for %d\n", pageNum);
-            // printTLB(TLB);
             TLB = makeMostRecent(TLB, pageNum, PID);
             continue;
         }
+
+        // printf("Checking pageTable Hit\n");
+        DLLElement* pageTableHit = pageTableHitOrMiss(pageNum, PID, pageTable);
+        if (pageTableHit != NULL)
+        {
+            addToPT = 0;
+            if (pageTableHit->valid != 1)
+            {
+                addToVM = 0;
+            }
+        }   
+
+        // printf("adding to vm\n");
+        // // Here we will be adding to the VM
+        if (addToVM == 1)
+        {
+            // Check if there is space in VM
+            if (currentVMSize < maxVMSize)
+            {
+                frameNum = currentVMSize;
+            }
+            else
+            {
+                /* Grab the frame number of the DLL element that's being 
+                evicted, then evict
+                */
+                frameNum = VM->frameNum;
+                VM = removeFront(VM);
+            }
+            VM = addToDLL(VM, pageNum, frameNum, PID, &currentVMSize, maxVMSize);
+        }
         else
         {
-            TLB = addToTLB(TLB, pageNum, 1, PID);
+            frameNum = pageTableHit->frameNum;
         }
+
+        // printf("adding to pageTable\n");
+        // Add to page Table
+        if (addToPT == 1)
+        {
+            pageTable = addToDLL(pageTable, pageNum, frameNum, PID, NULL, 0);
+        }
+
+        // Last step is always adding it to the VM
+        TLB = addToDLL(TLB, pageNum, frameNum, PID, &currentTLBSize, maxTLBSize);
     }
-    printf("Hit/Checks %d/%d\n", hits, checks);
-}
-
-void demoTLB()
-{
-    TLBElement* head = addToTLB(NULL, 10, 1, 1);
-    head = addToTLB(head, 9, 1, 1);
-    head = addToTLB(head, 8, 1, 1);
-    head = addToTLB(head, 7, 1, 1);
-    head = addToTLB(head, 6, 1, 1);
-    head = addToTLB(head, 5, 1, 1);
-    head = addToTLB(head, 4, 1, 1);
-    head = addToTLB(head, 3, 1, 1);
-    head = makeMostRecent(head, 5, 1);
-    head = addToTLB(head, 2, 1, 1);
-    head = makeMostRecent(head, 9, 1);
-    head = addToTLB(head, 1, 1, 1);
-
-    printTLB(head);
-    printf("-------------------\n");
-    printTLBBackwards(head);
+    // printf("Hit/Checks %d/%d\n", hits, checks);
+    return hits;
 }
 
 int main(int argc, char **argv)
 {
-    // #Checks
+    if (argc < 8){
+        printf("tvm379 pgsize tlbentries { g | p } quantum physPages { f | l } trace1 trace2 . . . tracen\n");
+        exit(1);
+    }
+
+    /* If this was inputted correctly only the first 7 are not trace files,
+    the rest of the arguments are trace files
+    */
+    int numTraceFiles = argc - 7;
+    int pgsize = atoi(argv[1]);
+    maxTLBSize = atoi(argv[2]);
+    char* uniformity = argv[3];
+    int quantum = atoi(argv[4]);
+    int physPages = atoi(argv[5]);
+    maxVMSize = physPages;
+
+    /* Eviction Policy is now a global variable as it will influence the flow 
+    of the program
+    */
+    evictionPolicy = calloc(2, sizeof(char));
+    evictionPolicy = argv[6];
+
+    //command line arguments, powers of 2
+    int test = pgsize;
+    int test2 = maxTLBSize;
+
+    while (((test % 2) == 0) && test > 1)
+        test /= 2;
+
+    if ((test != 1) || (pgsize < 16) || (pgsize > 65536))
     {
-        if (argc < 8){
-            printf("tvm379 pgsize tlbentries { g | p } quantum physpages { f | l } trace1 trace2 . . . tracen\n");
-            exit(1);
-        }
+        printf("pgsize must be a power of 2 and between the range of 16-65536");
+        exit(1);        
+    }
 
-        /* If this was inputted correctly only the first 7 are not trace files,
-        the rest of the arguments are trace files
-        */
-        int numTraceFiles = argc - 7;
-        int pgsize = atoi(argv[1]);
-        maxTLBSize = atoi(argv[2]);
-        char* uniformity = argv[3];
-        int quantum = atoi(argv[4]);
-        int physpages = atoi(argv[5]);
+    while (((test2 % 2) == 0) && test2 > 1)
+        test2 /= 2;
 
-        /* Eviction Policy is now a global variable as it will influence the flow 
-        of the program
-        */
-        evictionPolicy = calloc(2, sizeof(char));
-        evictionPolicy = argv[6];
+    if ((test2 != 1) || (maxTLBSize < 8) || (maxTLBSize > 256))
+    {
+        printf("tlbentries must be a power of 2 and between the range of 8-256");
+        exit(1);        
+    }
 
-        //command line arguments, powers of 2
-        int test = pgsize;
-        int test2 = maxTLBSize;
+    if (*uniformity != 'g' && *uniformity != 'p')
+    {
+        printf("Usage: Please enter g (global) or p to simulate whether the TLB distinguish across processes");   
+        exit(-1);
+    }
 
-        while (((test % 2) == 0) && test > 1)
-            test /= 2;
+    if (quantum <= 0)
+    {
+        printf("Usage: Quantum must be greater than zero.");		
+        exit(-1);
+    }
 
-        if ((test != 1) || (pgsize < 16) || (pgsize > 65536))
-        {
-            printf("pgsize must be a power of 2 and between the range of 16-65536");
-            exit(1);        
-        }
+    if (physPages > 1000000){
+        printf("physPages cannot be greater than 1000000\n");
+        exit(1);
+    }
 
-        while (((test2 % 2) == 0) && test2 > 1)
-            test2 /= 2;
+    if (*evictionPolicy != 'f' && *evictionPolicy != 'l')
+    {
+        printf("Usage: Please enter either f(FIFO) or l (LRU), to properly define a page eviction policy.");    
+        exit(-1);
+    }
 
-        if ((test2 != 1) || (maxTLBSize < 8) || (maxTLBSize > 256))
-        {
-            printf("tlbentries must be a power of 2 and between the range of 8-256");
-            exit(1);        
-        }
-
-        if (*uniformity != 'g' && *uniformity != 'p')
-        {
-            printf("Usage: Please enter g (global) or p to simulate whether the TLB distinguish across processes");   
-            exit(-1);
-        }
-
-        if (quantum <= 0)
-        {
-            printf("Usage: Quantum must be greater than zero.");		
-            exit(-1);
-        }
-
-        if (physpages > 1000000){
-            printf("physpages cannot be greater than 1000000\n");
-            exit(1);
-        }
-
-        if (*evictionPolicy != 'f' && *evictionPolicy != 'l')
-        {
-            printf("Usage: Please enter either f(FIFO) or l (LRU), to properly define a page eviction policy.");    
-            exit(-1);
-        }
-
-        FILE* fp[numTraceFiles];
-        off_t offset[numTraceFiles];
-        char* fileName;
-        for (int i = 0; i < numTraceFiles; ++i)
-        {
-            fp[i] = NULL;
-            fileName = argv[i + 7];
-            fp[i] = fopen(fileName, "rb");
-        }
+    FILE** fp[numTraceFiles];
+    char* fileName;
+    for (int i = 0; i < numTraceFiles; ++i)
+    {
+        fp[i] = NULL;
+        fileName = argv[i + 7];
+        fp[i] = fopen(fileName, "rb");
     }
 
     // Initialize the TLB
@@ -496,6 +517,17 @@ int main(int argc, char **argv)
     VM = NULL;
 
     // Initialize the Page Tables for all processes
+    DLLElement* pageTables[numTraceFiles];
+    for (int i = 0; i < numTraceFiles; ++i)
+    {
+        pageTables[i]= NULL;
+    }
+
+    DLLElement* VMHash[physPages];
+    for (int i = 0; i < physPages; ++i)
+    {
+        VMHash[i] = NULL;
+    }
 
     unsigned char* buffer;
     // allocate memory to contain the whole file:
@@ -506,6 +538,7 @@ int main(int argc, char **argv)
     int allEmpty = 1;
     int index = 0;
     int readReturn = 0;
+
     while(1)
     {
         readReturn = fread(buffer,1,(quantum*4),fp[index]);
@@ -516,7 +549,7 @@ int main(int argc, char **argv)
             /* In this assignment the process is simulated by the tracefile,
             hence the processId can be simulated by the index of the trace file.
             */
-            processQuantum(buffer, quantum, index);
+            processQuantum(buffer, quantum, index, pageTables[index]);
         }
 
         // printf("Buffer: %s\n", buffer);
@@ -535,10 +568,6 @@ int main(int argc, char **argv)
         }
         index++;
     }
-
-    // maxTLBSize = 8;
-    // evictionPolicy = 'l';
-    // demoTLB();
 
     return 0;
 }

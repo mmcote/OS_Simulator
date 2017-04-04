@@ -3,17 +3,23 @@
 
 int maxTLBSize;
 int currentTLBSize = 0;
+
+int maxVMSize;
+int currentVMSize = 0;
+
 char* evictionPolicy;
 
-typedef struct TLBElement
+typedef struct DLLElement
 {
     // pageNum | frameNum | PID | V/I
     int * pageNum;
     int * frameNum;
     int * PID;
     int * valid;
-    struct TLBElement* prev;
-    struct TLBElement* next;
-} TLBElement;
+    struct DLLElement* prev;
+    struct DLLElement* next;
+} DLLElement;
 
-TLBElement* TLB;
+DLLElement* TLB;
+DLLElement* VM;
+
