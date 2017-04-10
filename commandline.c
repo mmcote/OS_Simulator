@@ -1,5 +1,7 @@
 #include "simulator.h"
 
+DLLElement* last_element;
+
 void printTLB(DLLElement* head)
 {
     DLLElement* cursor = head;
@@ -67,11 +69,8 @@ DLLElement* append(DLLElement* head, int pageNum, int frameNum, int PID)
     }
 
     /* go to the last DLLElement */
-    DLLElement *cursor = head;
-    while(cursor->next != NULL)
-    {
-        cursor = cursor->next;
-    }
+    DLLElement *cursor = identifyBack(head);
+    //Brad changed
 
     /* create a new DLLElement */
     DLLElement* newNode =  create(pageNum, frameNum, PID, cursor, NULL);
@@ -150,6 +149,38 @@ DLLElement* removeBack(DLLElement* head)
     free(cursor->valid);
     free(cursor);
 
+    return head;
+}
+
+//Brad
+DLLElement* identifyBack(DLLELement* head)
+{
+    // If the head is already NULL
+    if(head == NULL)
+    {
+        return NULL;
+    }
+
+    // Get the last element of the linked list
+    DLLElement *cursor = head;
+    DLLElement *back = NULL;
+    while(cursor->next != NULL)
+    {
+        back = cursor;
+        cursor = cursor->next;
+    }
+
+    if(back != NULL)
+    {
+        back->next = NULL;
+    }
+
+    // if this is the last DLLElement in the list
+    if(cursor == head)
+    {
+        head = NULL;
+    }
+    
     return head;
 }
 
