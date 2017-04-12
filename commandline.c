@@ -44,12 +44,12 @@ void printDLL(DLLElement* head)
     DLLElement* cursor = head;
     while(cursor != NULL)
     {
-        printf("Page Number: %u, Frame Number: %u\n", *cursor->pageNum, *cursor->frameNum);
+        printf("Page Number: %u, Frame Number: %u\n", cursor->pageNum, cursor->frameNum);
         cursor = cursor->next;
     }
 }
 
-printDLLSize(DLLElement* head)
+void printDLLSize(DLLElement* head)
 {
     DLLElement* cursor = head;
     unsigned int i = 0;
@@ -75,7 +75,7 @@ void printDLLBackwards(DLLElement* head)
     }
     while(cursor != NULL)
     {
-        printf("Page Number: %d\n", *cursor->pageNum);
+        printf("Page Number: %d\n", cursor->pageNum);
         cursor = cursor->prev;
     }
 }
@@ -83,9 +83,13 @@ void printDLLBackwards(DLLElement* head)
 void markValidity(DLLElement* DLL, unsigned int pageNum, unsigned int frameNum, unsigned int PID, unsigned int validity)
 {
     DLLElement* cursor = DLL;
-    while (*cursor->pageNum != pageNum && *cursor->PID != PID && (cursor->frameNum == NULL || *cursor->frameNum != frameNum))
+    while (cursor->pageNum != pageNum && cursor->PID != PID && (cursor->frameNum == NULL || cursor->frameNum != frameNum))
     {
         cursor = cursor->next;
+        if (cursor == NULL)
+        {
+            return;
+        }
     }
     cursor->valid = validity;
     return;
@@ -101,15 +105,10 @@ DLLElement* create(unsigned int pageNum, unsigned int frameNum, unsigned int PID
         exit(0);
     }
 
-    newNode->pageNum = calloc(1, sizeof(int));
-    newNode->frameNum = calloc(1, sizeof(int));
-    newNode->PID = calloc(1, sizeof(int));
-    newNode->valid = calloc(1, sizeof(int));
-
-    *newNode->pageNum = pageNum;
-    *newNode->frameNum = frameNum;
-    *newNode->PID = PID;
-    *newNode->valid = 1;
+    newNode->pageNum = pageNum;
+    newNode->frameNum = frameNum;
+    newNode->PID = PID;
+    newNode->valid = 1;
 
     newNode->prev = prev;
     newNode->next = next;
@@ -193,54 +192,10 @@ DLLElement* removeFront(DLLElement* head)
         head = NULL;
     }
 
-    free(front->pageNum);
-    free(front->frameNum);
-    free(front->PID);
-    free(front->valid);
     free(front);
 
     return head;
 }
-
-
-// // TODO: Remove end with pointer to end node
-// DLLElement* removeBack(DLLElement* head)
-// {
-//     // If the head is already NULL
-//     if(head == NULL)
-//     {
-//         return NULL;
-//     }
-
-//     // Get the last element of the linked list
-//     DLLElement *cursor = head;
-//     DLLElement *back = NULL;
-//     while(cursor->next != NULL)
-//     {
-//         back = cursor;
-//         cursor = cursor->next;
-//     }
-
-//     if(back != NULL)
-//     {
-//         back->next = NULL;
-//     }
-
-//     // if this is the last DLLElement in the list
-//     if(cursor == head)
-//     {
-//         head = NULL;
-//     }
-
-//     free(cursor->pageNum);
-//     free(cursor->frameNum);
-//     free(cursor->PID);
-//     free(cursor->valid);
-//     free(cursor);
-
-//     return head;
-// }
-
 
 // This function will return the new last element of the list
 DLLElement* removeBack(DLLElement* end)
@@ -258,10 +213,6 @@ DLLElement* removeBack(DLLElement* end)
         end = end->prev;
     }
 
-    free(freeDLLElement->pageNum);
-    free(freeDLLElement->frameNum);
-    free(freeDLLElement->PID);
-    free(freeDLLElement->valid);
     free(freeDLLElement);
 
     return end;
@@ -309,10 +260,6 @@ DLLElement* removeNode(DLLElement* head,DLLElement* nd)
         cursor->prev = tmp->prev;
         tmp->prev = NULL;
         tmp->next = NULL;
-        free(tmp->pageNum);
-        free(tmp->frameNum);
-        free(tmp->PID);
-        free(tmp->valid);
         free(tmp);
     }
     return head;
@@ -321,16 +268,44 @@ DLLElement* removeNode(DLLElement* head,DLLElement* nd)
 /* VMMakeMostRecent will use the frame array to get a element by corresponding frame 
 number and modify it to be at the beginning of the VM
 */
-DLLElement* VMMakeMostRecent(DLLElement* VM, DLLElement** frames, unsigned int frame)
+DLLElement* VMMakeMostRecent(DLLElement* DLLVM, DLLElement** DLLVMEnd, DLLElement** frames, unsigned int frame)
 {
     DLLElement* cursor = frames[frame];
-    cursor->prev->next = cursor->next;
-    cursor->next->prev = cursor->prev;
+    if (frames[frame] == NULL)
+    {
+        printf("Error.");
+        return DLLVM;
+    }
 
+    // Check if element is the head
+    if (cursor->prev != NULL)
+    {
+        cursor->prev->next = cursor->next;
+    }
+    else
+    {
+        return DLLVM;
+    }
+
+    // If it is the last element
+    if (cursor->next != NULL)
+    {
+        cursor->next->prev = cursor->prev;
+    }
+    else // Must be the last element
+    {
+        cursor->prev->next = NULL;
+    }
+
+    //
+    if (cursor == *DLLVMEnd)
+    {
+        *DLLVMEnd = cursor->prev;
+    }
+
+    DLLVM->prev = cursor;
+    cursor->next = DLLVM;
     cursor->prev = NULL;
-
-    VM->prev = cursor;
-    cursor->next = VM;
 
     return cursor;
 }
@@ -338,16 +313,33 @@ DLLElement* VMMakeMostRecent(DLLElement* VM, DLLElement** frames, unsigned int f
 /* makeMostRecentGiven element, will make a given element the most recent when given the
 DLL that it is part of
 */
-DLLElement* makeMostRecentGivenElement(DLLElement* head, DLLElement* element)
+DLLElement* makeMostRecentGivenElement(DLLElement* head, DLLElement** end, DLLElement* element)
 {
-    if (element == VMEnd)
+    // Determine if the current element is already the head of the DLL
+    if (element->prev != NULL)
     {
-        VMEnd = element->prev;
+        element->prev->next = element->next;
+    }
+    else // Must be the first element
+    {
+        return head;
     }
 
-    element->next->prev = element->prev;
-    element->prev->next = element->next;
-    element->prev = NULL;
+    // Determine if this is the last element
+    if (element->next != NULL)
+    {
+        element->next->prev = element->prev;
+    }
+    else // Must be the last element
+    {
+        element->prev->next = NULL;
+    }
+
+    //
+    if (element == *end)
+    {
+        *end = element->prev;
+    }
 
     head->prev = element;
     element->next = head;
@@ -367,7 +359,7 @@ DLLElement* makeMostRecent(DLLElement* head, DLLElement** end, unsigned int page
     /* find the pageNum in the TLB */
     while (1)
     {
-        if (*cursor->pageNum == pageNum && *cursor->PID == PID)
+        if (cursor->pageNum == pageNum && cursor->PID == PID)
         {
             break;
         }
@@ -387,6 +379,7 @@ DLLElement* makeMostRecent(DLLElement* head, DLLElement** end, unsigned int page
     if (cursor->prev != NULL)
     {
         cursor->prev->next = cursor->next;
+
         if (cursor == *end && (*end)->prev != NULL)
         {
             (*end)->prev->next = NULL;
@@ -408,7 +401,7 @@ DLLElement* makeMostRecent(DLLElement* head, DLLElement** end, unsigned int page
     // If the item is being made most recent then 
     cursor->valid = 1;
 
-    head = cursor;
+    return cursor;
 }
 
 /* pageTableHitOrMiss is used to check whether the DLLElement belongs to the 
@@ -419,7 +412,7 @@ DLLElement* pageTableHitOrMiss(unsigned int pageNum, unsigned int PID, DLLElemen
     DLLElement* cursor = pageTable;
     while(cursor != NULL)
     {
-        if (*cursor->pageNum == pageNum)
+        if (cursor->pageNum == pageNum)
         {
             return cursor;
         }
@@ -442,7 +435,7 @@ DLLElement* TLBHitOrMiss(unsigned int pageNum, unsigned int PID, DLLElement* TLB
             break;
         }
 
-        if (*cursor->pageNum == pageNum && *cursor->PID == PID)
+        if (cursor->pageNum == pageNum && cursor->PID == PID)
         {
             return cursor;
         }
@@ -487,7 +480,7 @@ DLLElement* addToDLL(DLLElement* DLL, DLLElement** DLLEnd, unsigned int pageNum,
     return push(DLL, pageNum, frameNum, PID);
 }
 
-int processQuantum(unsigned char* buffer, int quantum, unsigned int PID, DLLElement** pageTable, DLLElement** frames)
+int processQuantum(unsigned char* buffer, int quantum, unsigned int PID, DLLElement** frames)
 {
     // Variables
     unsigned char* currentLocation = buffer;
@@ -547,17 +540,17 @@ int processQuantum(unsigned char* buffer, int quantum, unsigned int PID, DLLElem
         if (TLBHit != NULL)
         {
             hits++;
-
-            if (evictionPolicy == 'l')
+            if (*evictionPolicy == 'l')
             {
                 // Optimization
-                TLB = makeMostRecentGivenElement(TLB, TLBHit);
-
+                TLB = makeMostRecentGivenElement(TLB, &TLBEnd,TLBHit);
+                // TLB = makeMostRecent(TLB, &TLBEnd, pageNum, PID);
+                // NO MORE NEED FOR THIS AS WE ARE USING AN ARRAY
                 // CHANGE PAGE TABLES TO GIANT ARRAYS --> Prioritizing speed
                 // pageTable = makeMostRecent(pageTable, NULL, pageNum, PID);
-
                 // // Need to come up with a different method for updating the VM rather than traversing the whole thing
-                // VM = VMMakeMostRecent(VM, frames, PID);
+                
+                VM = VMMakeMostRecent(VM, &VMEnd, frames, PID);
                 // //VM = makeMostRecent(VM, pageNum, PID);
             }
 
@@ -567,98 +560,69 @@ int processQuantum(unsigned char* buffer, int quantum, unsigned int PID, DLLElem
             }
         }
 
-        DLLElement* pageTableHit = pageTableHitOrMiss(pageNum, PID, *pageTable);
+        unsigned int * pageTableHit = pageTablesArray[PID][pageNum];
         if (pageTableHit != NULL)
         {
-        //     addToPT = 0;
+            addToPT = 0;
+            addToVM = 0;
+            /* This is if the element is valid and we don't have to substitute an
+            element from the VM
+            */
+            if (*evictionPolicy == 'l')
+            {
+                VM = VMMakeMostRecent(VM, &VMEnd, frames, PID);
+            }
+        } 
 
-        //     /* This is if the element is valid and we don't have to substitute an
-        //     element from the VM
-        //     */
-        //     if (pageTableHit->valid != 1)
-        //     {               
-        //         // if (evictionPolicy == 'l')
-        //         // {
-        //         //     VM = VMMakeMostRecent(VM, frames, PID);
-        //         //     // VM = makeMostRecent(VM, pageNum, PID);
-        //         // }
-        //         // addToVM = 0;
-        //     }
+        // Here we will be adding to the VM
+        if (addToVM == 1)
+        {
+            // Check if there is space in VM
+            if (currentVMSize < maxVMSize)
+            {
+                frameNum = currentVMSize;
+            }
+            else
+            {
+                /* Grab the frame number of the DLL element that's being 
+                evicted, then evict
+                */
+                frameNum = VMEnd->frameNum;  
 
-        //     if (evictionPolicy == 'l') 
-        //     {
-        //         *pageTable = makeMostRecentGivenElement(*pageTable, pageTableHit);
-        //     }
-        // } 
+                // Set the pageTable element to NULL representing an invalid bit
+                pageTablesArray[VMEnd->PID][VMEnd->pageNum] = NULL;
 
-    //     // Here we will be adding to the VM
-    //     if (addToVM == 1)
-    //     {
-    //         // Check if there is space in VM
-    //         if (currentVMSize < maxVMSize)
-    //         {
-    //             frameNum = currentVMSize;
-    //         }
-    //         else
-    //         {
-    //             /* Grab the frame number of the DLL element that's being 
-    //             evicted, then evict
-    //             */
-    //             frameNum = *VMEnd->frameNum;  
+                // Check if the element being removed is in the TLB
+                DLLElement* EndElementTLBHit = TLBHitOrMiss(VMEnd->pageNum, VMEnd->PID, TLB);
+                if (EndElementTLBHit != NULL)
+                {
+                    markValidity(TLB, pageNum, frameNum, PID, 0);
+                }
+            }
 
-    //             /* If the given element being removed is in the page table
-    //             or TLB then set there validity bit as invalid.
-    //             */
-    //             if (pageTableHit != NULL)
-    //             {
-    //                 markValidity(pageTable, pageNum, NULL, PID, 0);
-    //             }
+            // Only when we add to the VM do we set the frames[frameNum] pointer
+            VM = addToDLL(VM, &VMEnd, pageNum, frameNum, PID, &currentVMSize, maxVMSize);
 
-    //             if (TLBHit != NULL)
-    //             {
-    //                 markValidity(TLB, pageNum, frameNum, PID, 0);             
-    //             }
+            // Only when we change an element in the VM do we update the frame
+            frames[frameNum] = VM;
+        }
 
-    //             diff = clock() - start;
-    //             int msec = diff * 1000 / CLOCKS_PER_SEC;
-    //             printf("Time taken %d seconds %d milliseconds\n", msec/1000, msec%1000);
-    //         }
-
-    //         // Only when we add to the VM do we set the frames[frameNum] pointer
-    //         addToDLL(&VM, &VMEnd, pageNum, frameNum, PID, &currentVMSize, maxVMSize);
-
-    //         // Only when we change an element in the VM do we update the frame
-    //         frames[frameNum] = VM;
-
-    //         if (pageTableHit != NULL)
-    //         {
-    //             pageTableHit->valid = 1;
-
-    //             if (TLBHit != NULL)
-    //             {
-    //                 TLBHit->valid = 1;
-    //                 continue;
-    //             }
-    //         }
-    //     }
-
-        // // Grab the frame number from the pageTable, if it is already in the VM
-        // if (addToVM != 1)
-        // {
-        //     frameNum = *pageTableHit->frameNum;
-        // }
+        // Grab the frame number from the pageTable, if it is already in the VM
+        if (addToVM != 1)
+        {
+            frameNum = pageTablesArray[PID][pageNum];
+        }
 
         // Add to page Table
-        // if (addToPT == 1)
-        // {
-        //     *pageTable = addToDLL(*pageTable, NULL, pageNum, frameNum, PID, NULL, 0);
-        // }
+        if (addToPT == 1)
+        {
+            pageTablesArray[PID][pageNum] = frameNum;
+        }
 
         // Last step is always adding it to the VM
-        frameNum = 5;
         TLB = addToDLL(TLB, &TLBEnd, pageNum, frameNum, PID, &currentTLBSize, maxTLBSize);
     }
-    // printDLLSize(*pageTable);
+    // printDLLSize(TLB);
     // printf("Hit/Checks %d/%d\n", hits, checks);
     return hits;
 }
@@ -668,23 +632,54 @@ void demoTLB()
     unsigned int current = 0;
     DLLElement* end = malloc(sizeof(DLLElement));
     DLLElement* head = NULL;
-    head = addToDLL(head, &end, 10, 1, 1, &current, 10);
-    head = addToDLL(head, &end, 9, 1, 1, &current, 10);
-    head = addToDLL(head, &end, 8, 1, 1, &current, 10);
+    head = addToDLL(head, &end, 10, 1, 1, &current, 30);
+    head = addToDLL(head, &end, 9, 1, 1, &current, 30);
+    head = addToDLL(head, &end, 8, 1, 1, &current, 30);
     head = makeMostRecent(head, &end, 10, 1);
-    head = addToDLL(head, &end, 7, 1, 1, &current, 10);
-    head = addToDLL(head, &end, 6, 1, 1, &current, 10);
-    head = addToDLL(head, &end, 5, 1, 1, &current, 10);
-    head = addToDLL(head, &end, 4, 1, 1, &current, 10);
-    head = addToDLL(head, &end, 3, 1, 1, &current, 10);
+    head = addToDLL(head, &end, 7, 1, 1, &current, 30);
+    head = addToDLL(head, &end, 6, 1, 1, &current, 30);
+    head = addToDLL(head, &end, 5, 1, 1, &current, 30);
+    head = addToDLL(head, &end, 4, 1, 1, &current, 30);
+    head = addToDLL(head, &end, 3, 1, 1, &current, 30);
     head = makeMostRecent(head, &end, 5, 1);
-    head = addToDLL(head, &end, 2, 1, 1, &current, 10);
+    head = addToDLL(head, &end, 2, 1, 1, &current, 30);
     head = makeMostRecent(head, &end, 9, 1);
-    head = addToDLL(head, &end, 1, 1, 1, &current, 10);
-    head = addToDLL(head, &end, 6, 1, 1, &current, 10);
-    head = addToDLL(head, &end, 5, 1, 1, &current, 10);
-    head = addToDLL(head, &end, 4, 1, 1, &current, 10);
-    head = addToDLL(head, &end, 3, 1, 1, &current, 10);
+    head = addToDLL(head, &end, 1, 1, 1, &current, 30);
+    head = addToDLL(head, &end, 6, 1, 1, &current, 30);
+    head = addToDLL(head, &end, 5, 1, 1, &current, 30);
+    head = addToDLL(head, &end, 4, 1, 1, &current, 30);
+    head = addToDLL(head, &end, 3, 1, 1, &current, 30);
+
+    printDLL(head);
+    printf("-------------------\n");
+    printDLLBackwards(end);
+}
+
+void demoMostRecentWithElementTLB()
+{
+    unsigned int current = 0;
+    DLLElement* end = malloc(sizeof(DLLElement));
+    DLLElement* head = NULL;
+    head = addToDLL(head, &end, 10, 1, 1, &current, 30);
+    head = addToDLL(head, &end, 9, 1, 1, &current, 30);
+    head = addToDLL(head, &end, 8, 1, 1, &current, 30);
+    DLLElement* recent = TLBHitOrMiss(8, 1, head);
+    head = makeMostRecentGivenElement(head, &end, recent);
+    head = addToDLL(head, &end, 7, 1, 1, &current, 30);
+    head = addToDLL(head, &end, 6, 1, 1, &current, 30);
+    head = addToDLL(head, &end, 5, 1, 1, &current, 30);
+    head = addToDLL(head, &end, 4, 1, 1, &current, 30);
+    head = addToDLL(head, &end, 3, 1, 1, &current, 30);
+    recent = TLBHitOrMiss(5, 1, head);
+    head = makeMostRecentGivenElement(head, &end, recent);
+    head = addToDLL(head, &end, 2, 1, 1, &current, 30);
+    recent = TLBHitOrMiss(9, 1, head);
+    head = makeMostRecentGivenElement(head, &end, recent);
+    head = addToDLL(head, &end, 1, 1, 1, &current, 30);
+    head = addToDLL(head, &end, 6, 1, 1, &current, 30);
+    head = addToDLL(head, &end, 5, 1, 1, &current, 30);
+    head = addToDLL(head, &end, 4, 1, 1, &current, 30);
+    head = addToDLL(head, &end, 3, 1, 1, &current, 30);
 
     printDLL(head);
     printf("-------------------\n");
@@ -753,7 +748,6 @@ int main(int argc, char **argv)
         }
     }
 
-
     if (*uniformity != 'g' && *uniformity != 'p')
     {
         printf("Usage: Please enter g (global) or p to simulate whether the TLB distinguish across processes");   
@@ -786,12 +780,18 @@ int main(int argc, char **argv)
     }
 
     FILE** fp[numTraceFiles];
+    unsigned int filesize[numTraceFiles];
     char* fileName;
     for (i = 0; i < numTraceFiles; ++i)
     {
         fp[i] = NULL;
         fileName = argv[i + 7];
         fp[i] = fopen(fileName, "rb");
+
+        // int bytes;
+        // for(bytes = 0; getc(fp[i]) != EOF; ++bytes);
+        // filesize[i] = bytes;
+        // rewind(fp[i]);
     }
 
     // Initialize the TLB
@@ -805,11 +805,17 @@ int main(int argc, char **argv)
     VMEnd->pageNum = NULL;
 
     // Initialize the Page Tables for all processes
-    DLLElement* pageTables[numTraceFiles];
-    for (i = 0; i < numTraceFiles; ++i)
+    pageTablesArray = (unsigned int **) malloc(numTraceFiles*sizeof(unsigned int *));
+    for(i=0;i<numTraceFiles;i++)
     {
-        pageTables[i] = NULL;
+        pageTablesArray[i]=(unsigned int *) malloc(1000*sizeof(unsigned int));
     }
+
+    // DLLElement* pageTables[numTraceFiles];
+    // for (i = 0; i < numTraceFiles; ++i)
+    // {
+    //     pageTables[i] = NULL;
+    // }
 
     DLLElement* VMHash[physPages];
     for (i = 0; i < physPages; ++i)
@@ -826,24 +832,36 @@ int main(int argc, char **argv)
     int allEmpty = 1;
     int index = 0;
     int readReturn = 0;
+
     // The only way that this loop will quit is when all the files are empty
     // int z = 0;
+    int readAmount = 0;
     while(1)
     {
-        // printf("Z: %d\n", z);
-        // ++z;
-        // printf("Quantum\n");
+        // printf("Here");
         // Read in only the amount that is needed for one round of the round robin
-        readReturn = fread(buffer,1,(quantum*4),fp[index]);
-        if (readReturn != 0)
+        // if (filesize[index] < quantum)
+        // {
+        //     readAmount = filesize[index];
+        // }
+        // else
+        // {
+        //     filesize[index] -= quantum;
+        //     readAmount = quantum;
+        // }
+
+        readReturn = fread(buffer,1,quantum*4,fp[index]);
+
+        if (readReturn != 0)// && readAmount != 0)
         {
             allEmpty = 0;
             /* In this assignment the process is simulated by the tracefile,
             hence the processId can be simulated by the index of the trace file.
             */
-            processQuantum(buffer, quantum, index, &pageTables[index], frames);
+            processQuantum(buffer, quantum, index, frames);
         }
 
+        bzero(buffer, quantum*4);
         if (index == (numTraceFiles - 1) && allEmpty == 1)
         {
             break;
@@ -857,13 +875,15 @@ int main(int argc, char **argv)
         }
         index++;
     }
+
+    // maxTLBSize = 13;
+    // evictionPolicy = 'l';
+    // demoMostRecentWithElementTLB();
+
     int msec;
     diff = clock() - start;
     msec = diff * 1000 / CLOCKS_PER_SEC;
     printf("Time taken %d seconds %d milliseconds\n", msec/1000, msec%1000);
 
-    // maxTLBSize = 8;
-    // evictionPolicy = 'l';
-    // demoTLB();
     return 0;
 }

@@ -9,15 +9,17 @@ unsigned int currentTLBSize = 0;
 unsigned int maxVMSize;
 unsigned int currentVMSize = 0;
 
+unsigned int** pageTablesArray;
+
 char* evictionPolicy;
 
 typedef struct DLLElement
 {
     // pageNum | frameNum | PID | V/I
-    unsigned int * pageNum;
-    unsigned int * frameNum;
-    unsigned int * PID;
-    unsigned int * valid;
+    unsigned int pageNum;
+    unsigned int frameNum;
+    unsigned int PID;
+    unsigned int valid;
     struct DLLElement* prev;
     struct DLLElement* next;
 } DLLElement;
