@@ -13,9 +13,9 @@ unsigned int currentVMSize = 0;
 unsigned int offset;
 
 int** pageTablesArray;
-long double* pageFaults;
-long double* pageOuts;
-long double* pageHits;
+unsigned int* pageFaults;
+unsigned int* pageOuts;
+unsigned int* pageHits;
 
 char* evictionPolicy;
 

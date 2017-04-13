@@ -815,9 +815,9 @@ int main(int argc, char **argv)
     }
 
 
-    pageFaults = malloc(numTraceFiles*sizeof(long double));
-    pageOuts = malloc(numTraceFiles*sizeof(long double));
-    pageHits = malloc(numTraceFiles*sizeof(long double));
+    pageFaults = malloc(numTraceFiles*sizeof(unsigned int));
+    pageOuts = malloc(numTraceFiles*sizeof(unsigned int));
+    pageHits = malloc(numTraceFiles*sizeof(unsigned int));
 
     FILE** fp[numTraceFiles];
     unsigned int filesize[numTraceFiles];
@@ -926,13 +926,8 @@ int main(int argc, char **argv)
         // average = 
         printf("Total %LF\n", totalEndCount);
         // average = average / totalQuantumCount;
-        printf("TLBHits: %LF, PageFaults: %LF, PageOuts: %LF, Averages: %LF, Count: %LF\n", pageHits[m], pageFaults[m], pageOuts[m], average, tillEndCount[m]);
+        printf("TLBHits: %u, PageFaults: %u, PageOuts: %u, Averages: %LF, Count: %LF\n", pageHits[m], pageFaults[m], pageOuts[m], average, tillEndCount[m]);
     }
-
-    // printDLL(VM);
-    // maxTLBSize = 13;
-    // evictionPolicy = 'l';
-    // demoMostRecentWithElementTLB();
 
     return 0;
 }
