@@ -1,5 +1,6 @@
 #include "tvm379.h"
 
+/* This function is used to mark a particular DLL Element as either valid or invalid in a particular DLL */
 void markValidity(DLLElement* DLL, unsigned int pageNum, unsigned int frameNum, unsigned int PID, unsigned int validity)
 {
     DLLElement* cursor = DLL;
@@ -15,6 +16,7 @@ void markValidity(DLLElement* DLL, unsigned int pageNum, unsigned int frameNum, 
     return;
 }
 
+/* clearDLL is used to clear a given DLL by freeing all elements in the DLL */
 void clearDLL(DLLElement* head)
 {
    DLLElement* tmp;
@@ -75,7 +77,6 @@ As for LRU, if this is just used once it will be the least
 recently used.
 As for FIFO, we can just grab from the head.
 */
-// TODO: Change to append to the end node of the DLL
 DLLElement* append(DLLElement* head, unsigned int pageNum, unsigned int frameNum, unsigned int PID)
 {
     if(head == NULL)
@@ -517,7 +518,7 @@ void processQuantum(unsigned char* buffer, int quantum, unsigned int PID, DLLEle
                 evicted, then evict
                 */
                 frameNum = VMEnd->frameNum;  
-                currentVMDistribution[VMEnd->PID] += 1;
+                currentVMDistribution[VMEnd->PID] -= 1;
 
                 // printf("VMEnd->pageNum: %u, VMEnd->PID: %u, VMEnd->frameNum: %u\n", VMEnd->pageNum, VMEnd->PID, VMEnd->frameNum);
                 // Mark pageout for process
@@ -779,8 +780,8 @@ int main(int argc, char **argv)
     int m = 0;
     for (; m < numTraceFiles; m++)
     {
-        // difference = pageFaults[m] - pageOuts[m];
-        // average = currentAverages[m] / totalEndCount;
+        difference = pageFaults[m] - pageOuts[m];
+        average = currentAverages[m] / totalEndCount;
         // average = average / totalQuantumCount;
         printf("%u %u %u %LF\n", pageHits[m], pageFaults[m], pageOuts[m], average);
     }
