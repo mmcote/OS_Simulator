@@ -44,7 +44,7 @@ void printDLL(DLLElement* head)
     DLLElement* cursor = head;
     while(cursor != NULL)
     {
-        printf("Page Number: %u, Frame Number: %u\n", cursor->pageNum, cursor->frameNum);
+        printf("Page Number: %u, PID: %u, Frame Number: %u\n", cursor->pageNum, cursor->PID, cursor->frameNum);
         cursor = cursor->next;
     }
 }
@@ -93,6 +93,18 @@ void markValidity(DLLElement* DLL, unsigned int pageNum, unsigned int frameNum, 
     }
     cursor->valid = validity;
     return;
+}
+
+void clearDLL(DLLElement* head)
+{
+   DLLElement* tmp;
+
+   while (head != NULL)
+    {
+       tmp = head;
+       head = head->next;
+       free(tmp);
+    }
 }
 
 // Used to create the head node
@@ -270,13 +282,18 @@ number and modify it to be at the beginning of the VM
 */
 DLLElement* VMMakeMostRecent(DLLElement* DLLVM, DLLElement** DLLVMEnd, DLLElement** frames, unsigned int frame)
 {
+    // printf("Check 1\n");
+    // printf("frame: %u\n", frame);
     DLLElement* cursor = frames[frame];
-    if (frames[frame] == NULL)
+
+    // printf("Check 2\n");
+    if (cursor == NULL)
     {
         printf("Error.");
         return DLLVM;
     }
 
+    // printf("Check 3\n");
     // Check if element is the head
     if (cursor->prev != NULL)
     {
@@ -287,6 +304,7 @@ DLLElement* VMMakeMostRecent(DLLElement* DLLVM, DLLElement** DLLVMEnd, DLLElemen
         return DLLVM;
     }
 
+    // printf("Check 4\n");
     // If it is the last element
     if (cursor->next != NULL)
     {
@@ -297,12 +315,13 @@ DLLElement* VMMakeMostRecent(DLLElement* DLLVM, DLLElement** DLLVMEnd, DLLElemen
         cursor->prev->next = NULL;
     }
 
-    //
+    // printf("Check 5\n");
     if (cursor == *DLLVMEnd)
     {
         *DLLVMEnd = cursor->prev;
     }
 
+    // printf("Check 6\n");
     DLLVM->prev = cursor;
     cursor->next = DLLVM;
     cursor->prev = NULL;
@@ -335,7 +354,6 @@ DLLElement* makeMostRecentGivenElement(DLLElement* head, DLLElement** end, DLLEl
         element->prev->next = NULL;
     }
 
-    //
     if (element == *end)
     {
         *end = element->prev;
@@ -427,14 +445,8 @@ TLB state.
 DLLElement* TLBHitOrMiss(unsigned int pageNum, unsigned int PID, DLLElement* TLB)
 {
     DLLElement* cursor = TLB;
-    int i = 0;
-    while(1)
+    while(cursor != NULL)
     {
-        if (cursor == NULL || cursor->pageNum == NULL)
-        {
-            break;
-        }
-
         if (cursor->pageNum == pageNum && cursor->PID == PID)
         {
             return cursor;
@@ -460,6 +472,10 @@ DLLElement* addToDLL(DLLElement* DLL, DLLElement** DLLEnd, unsigned int pageNum,
         we just remove
         */
         *DLLEnd = removeBack(*DLLEnd);
+        // if ((*DLLEnd)->PID == 1)
+        // {
+        //     printf("*DLLEnd->PID: %u\n", (*DLLEnd)->PID);
+        // }
         *currentSize -= 1;
     }
 
@@ -480,7 +496,7 @@ DLLElement* addToDLL(DLLElement* DLL, DLLElement** DLLEnd, unsigned int pageNum,
     return push(DLL, pageNum, frameNum, PID);
 }
 
-int processQuantum(unsigned char* buffer, int quantum, unsigned int PID, DLLElement** frames)
+void processQuantum(unsigned char* buffer, int quantum, unsigned int PID, DLLElement** frames)
 {
     // Variables
     unsigned char* currentLocation = buffer;
@@ -493,6 +509,13 @@ int processQuantum(unsigned char* buffer, int quantum, unsigned int PID, DLLElem
     unsigned int hits = 0;
     unsigned int checks = 0;
 
+    unsigned int pageFaultsForQuantum = 0;
+    unsigned int pageOutsForQuantum[numTraceFiles];
+    int b = 0;
+    for(; b < numTraceFiles; ++b)
+    {
+        pageOutsForQuantum[b] = 0;
+    }
     /* This is a check variable, that will be flagged if we intend to add to the 
     page table */
     int addToPT;
@@ -509,8 +532,6 @@ int processQuantum(unsigned char* buffer, int quantum, unsigned int PID, DLLElem
         addToVM = 1;
         addToPT = 1;
         pageNum = 0;
-
-        // start = clock();
        
         // // Foreach quantum read in the four next bytes
         int j = 0;
@@ -527,13 +548,11 @@ int processQuantum(unsigned char* buffer, int quantum, unsigned int PID, DLLElem
             }
         }
 
-        // reverse the order of the read in bits
-        pageNum = reverse(pageNum);
-        pageNum = pageNum >> 12;
-
+        pageNum = pageNum >> offset;
         DLLElement* TLBHit = TLBHitOrMiss(pageNum, PID, TLB);
         checks++;
 
+        // CHECK FOR TLB HIT
         /* If there is a TLB hit then continue, although before continuing:
             - If the eviction policy is LRU --> make the DLLElement the most recent one, in all tables
         */
@@ -542,16 +561,8 @@ int processQuantum(unsigned char* buffer, int quantum, unsigned int PID, DLLElem
             hits++;
             if (*evictionPolicy == 'l')
             {
-                // Optimization
                 TLB = makeMostRecentGivenElement(TLB, &TLBEnd,TLBHit);
-                // TLB = makeMostRecent(TLB, &TLBEnd, pageNum, PID);
-                // NO MORE NEED FOR THIS AS WE ARE USING AN ARRAY
-                // CHANGE PAGE TABLES TO GIANT ARRAYS --> Prioritizing speed
-                // pageTable = makeMostRecent(pageTable, NULL, pageNum, PID);
-                // // Need to come up with a different method for updating the VM rather than traversing the whole thing
-                
-                VM = VMMakeMostRecent(VM, &VMEnd, frames, PID);
-                // //VM = makeMostRecent(VM, pageNum, PID);
+                VM = VMMakeMostRecent(VM, &VMEnd, frames, TLBHit->frameNum);
             }
 
             if (TLBHit->valid == 1)
@@ -560,19 +571,29 @@ int processQuantum(unsigned char* buffer, int quantum, unsigned int PID, DLLElem
             }
         }
 
-        unsigned int * pageTableHit = pageTablesArray[PID][pageNum];
-        if (pageTableHit != NULL)
+        int pageTableHit = -1;
+        pageTableHit = pageTablesArray[PID][pageNum];
+        if (PID == 1)
+        {
+            // printf("pageTableHit: %u\n", pageTableHit);
+        }
+        if (pageTableHit != -1)
         {
             addToPT = 0;
             addToVM = 0;
+
             /* This is if the element is valid and we don't have to substitute an
             element from the VM
             */
             if (*evictionPolicy == 'l')
             {
-                VM = VMMakeMostRecent(VM, &VMEnd, frames, PID);
+                VM = VMMakeMostRecent(VM, &VMEnd, frames, pageTableHit);
             }
-        } 
+        }
+        else
+        {
+            pageFaultsForQuantum += 1;
+        }
 
         // Here we will be adding to the VM
         if (addToVM == 1)
@@ -588,9 +609,12 @@ int processQuantum(unsigned char* buffer, int quantum, unsigned int PID, DLLElem
                 evicted, then evict
                 */
                 frameNum = VMEnd->frameNum;  
+                // printf("VMEnd->pageNum: %u, VMEnd->PID: %u, VMEnd->frameNum: %u\n", VMEnd->pageNum, VMEnd->PID, VMEnd->frameNum);
+                // Mark pageout for process
+                pageOutsForQuantum[VMEnd->PID] += 1;
 
                 // Set the pageTable element to NULL representing an invalid bit
-                pageTablesArray[VMEnd->PID][VMEnd->pageNum] = NULL;
+                pageTablesArray[VMEnd->PID][VMEnd->pageNum] = -1;
 
                 // Check if the element being removed is in the TLB
                 DLLElement* EndElementTLBHit = TLBHitOrMiss(VMEnd->pageNum, VMEnd->PID, TLB);
@@ -613,18 +637,28 @@ int processQuantum(unsigned char* buffer, int quantum, unsigned int PID, DLLElem
             frameNum = pageTablesArray[PID][pageNum];
         }
 
-        // Add to page Table
+        // // Add to page Table
         if (addToPT == 1)
         {
             pageTablesArray[PID][pageNum] = frameNum;
         }
-
         // Last step is always adding it to the VM
         TLB = addToDLL(TLB, &TLBEnd, pageNum, frameNum, PID, &currentTLBSize, maxTLBSize);
     }
-    // printDLLSize(TLB);
+    // printf("HitsInside: %u\n", hits);
     // printf("Hit/Checks %d/%d\n", hits, checks);
-    return hits;
+    // printf("pageFaultsForQuantum: %u\n", pageFaultsForQuantum);
+    // printf("pageFaultsForQuantum: %u\n", pageFaultsForQuantum);
+    
+    int p = 0;
+    for (; p < numTraceFiles; p++)
+    {
+        // printf("PID: %u, pageOuts[%d]: %u, pageOutsForQuantum[%d]: %u\n", p, p, pageOuts[p], p, pageOutsForQuantum[p]);
+        pageOuts[p] += pageOutsForQuantum[p];
+    }
+    pageFaults[PID] += pageFaultsForQuantum;
+    pageHits[PID] += hits;
+    return;
 }
 
 void demoTLB()
@@ -699,7 +733,7 @@ int main(int argc, char **argv)
     /* If this was inputted correctly only the first 7 are not trace files,
     the rest of the arguments are trace files
     */
-    unsigned int numTraceFiles = argc - 7;
+    numTraceFiles = argc - 7;
 
     // pgsize, after the offset we arrive at 2^20, divide this by the pgsize, and we get the size of the pageTable
     unsigned int pgsize = atoi(argv[1]);
@@ -724,28 +758,29 @@ int main(int argc, char **argv)
     evictionPolicy = argv[6];
 
     //command line arguments, powers of 2
+    int test = pgsize;
+    int test2 = maxTLBSize;
+
+    // Ensure the pgsize is a power of 2
+    while (((test % 2) == 0) && test > 1)
     {
-        int test = pgsize;
-        int test2 = maxTLBSize;
+        test /= 2;
+        ++offset;
+    }
 
-        // Ensure the pgsize is a power of 2
-        while (((test % 2) == 0) && test > 1)
-            test /= 2;
+    if ((test != 1) || (pgsize < 16) || (pgsize > 65536))
+    {
+        printf("pgsize must be a power of 2 and between the range of 16-65536");
+        exit(1);        
+    }
 
-        if ((test != 1) || (pgsize < 16) || (pgsize > 65536))
-        {
-            printf("pgsize must be a power of 2 and between the range of 16-65536");
-            exit(1);        
-        }
+    while (((test2 % 2) == 0) && test2 > 1)
+        test2 /= 2;
 
-        while (((test2 % 2) == 0) && test2 > 1)
-            test2 /= 2;
-
-        if ((test2 != 1) || (maxTLBSize < 8) || (maxTLBSize > 256))
-        {
-            printf("tlbentries must be a power of 2 and between the range of 8-256");
-            exit(1);        
-        }
+    if ((test2 != 1) || (maxTLBSize < 8) || (maxTLBSize > 256))
+    {
+        printf("tlbentries must be a power of 2 and between the range of 8-256");
+        exit(1);        
     }
 
     if (*uniformity != 'g' && *uniformity != 'p')
@@ -779,19 +814,28 @@ int main(int argc, char **argv)
         exit(-1);
     }
 
+
+    pageFaults = malloc(numTraceFiles*sizeof(long double));
+    pageOuts = malloc(numTraceFiles*sizeof(long double));
+    pageHits = malloc(numTraceFiles*sizeof(long double));
+
     FILE** fp[numTraceFiles];
     unsigned int filesize[numTraceFiles];
     char* fileName;
-    for (i = 0; i < numTraceFiles; ++i)
-    {
-        fp[i] = NULL;
-        fileName = argv[i + 7];
-        fp[i] = fopen(fileName, "rb");
 
-        // int bytes;
-        // for(bytes = 0; getc(fp[i]) != EOF; ++bytes);
-        // filesize[i] = bytes;
-        // rewind(fp[i]);
+    int a = 0;
+    unsigned int TLBHits[numTraceFiles];
+    for (a = 0; a < numTraceFiles; ++a)
+    {
+        fp[a] = NULL;
+        fileName = argv[a + 7];
+        fp[a] = fopen(fileName, "rb");
+
+        TLBHits[a] = 0;
+
+        pageFaults[a] = 0;
+        pageOuts[a] = 0;
+        pageHits[a] = 0;
     }
 
     // Initialize the TLB
@@ -804,23 +848,16 @@ int main(int argc, char **argv)
     VMEnd = (DLLElement*)malloc(sizeof(DLLElement));
     VMEnd->pageNum = NULL;
 
+    int j = 0;
     // Initialize the Page Tables for all processes
-    pageTablesArray = (unsigned int **) malloc(numTraceFiles*sizeof(unsigned int *));
-    for(i=0;i<numTraceFiles;i++)
+    pageTablesArray = (int **) malloc(numTraceFiles*sizeof(unsigned int *));
+    for(i = 0;i < numTraceFiles; i++)
     {
-        pageTablesArray[i]=(unsigned int *) malloc(1000*sizeof(unsigned int));
-    }
-
-    // DLLElement* pageTables[numTraceFiles];
-    // for (i = 0; i < numTraceFiles; ++i)
-    // {
-    //     pageTables[i] = NULL;
-    // }
-
-    DLLElement* VMHash[physPages];
-    for (i = 0; i < physPages; ++i)
-    {
-        VMHash[i] = NULL;
+        pageTablesArray[i]=(int *) malloc(pow(2, 32-test)*sizeof(unsigned int));
+        for (j = 0; j < pgsize; ++j)
+        {
+            pageTablesArray[i][j] = -1;
+        }
     }
 
     unsigned char* buffer;
@@ -834,22 +871,14 @@ int main(int argc, char **argv)
     int readReturn = 0;
 
     // The only way that this loop will quit is when all the files are empty
-    // int z = 0;
-    int readAmount = 0;
+    long double tillEndCount[numTraceFiles];
+    for (i = 0; i < numTraceFiles; ++i)
+    {
+        tillEndCount[i] = 0;
+    }
+    long double totalEndCount = 0;
     while(1)
     {
-        // printf("Here");
-        // Read in only the amount that is needed for one round of the round robin
-        // if (filesize[index] < quantum)
-        // {
-        //     readAmount = filesize[index];
-        // }
-        // else
-        // {
-        //     filesize[index] -= quantum;
-        //     readAmount = quantum;
-        // }
-
         readReturn = fread(buffer,1,quantum*4,fp[index]);
 
         if (readReturn != 0)// && readAmount != 0)
@@ -858,7 +887,17 @@ int main(int argc, char **argv)
             /* In this assignment the process is simulated by the tracefile,
             hence the processId can be simulated by the index of the trace file.
             */
-            processQuantum(buffer, quantum, index, frames);
+            processQuantum(buffer, quantum, index, &frames);
+
+            if (*uniformity == 'p' && TLB != NULL)
+            {
+                clearDLL(TLB);
+                TLBEnd = NULL;
+                TLB = NULL;
+                currentTLBSize = 0;
+            }
+            tillEndCount[index] += 1;
+            totalEndCount += 1;
         }
 
         bzero(buffer, quantum*4);
@@ -875,15 +914,25 @@ int main(int argc, char **argv)
         }
         index++;
     }
+    long double average;
+    long double difference;
+    // Print the stats of the simulation
+    int m = 0;
+    for (; m < numTraceFiles; m++)
+    {
+        difference = pageFaults[m] - pageOuts[m];
+        average = difference / tillEndCount[m];
+        // average = difference*(difference/(1.0/(difference/tillEndCount[m])));
+        // average = 
+        printf("Total %LF\n", totalEndCount);
+        // average = average / totalQuantumCount;
+        printf("TLBHits: %LF, PageFaults: %LF, PageOuts: %LF, Averages: %LF, Count: %LF\n", pageHits[m], pageFaults[m], pageOuts[m], average, tillEndCount[m]);
+    }
 
+    // printDLL(VM);
     // maxTLBSize = 13;
     // evictionPolicy = 'l';
     // demoMostRecentWithElementTLB();
-
-    int msec;
-    diff = clock() - start;
-    msec = diff * 1000 / CLOCKS_PER_SEC;
-    printf("Time taken %d seconds %d milliseconds\n", msec/1000, msec%1000);
 
     return 0;
 }

@@ -1,15 +1,21 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
-
-
+#include <math.h>
+unsigned int numTraceFiles = 0;
+unsigned int onetest = 1;
 unsigned int maxTLBSize;
 unsigned int currentTLBSize = 0;
 
 unsigned int maxVMSize;
 unsigned int currentVMSize = 0;
 
-unsigned int** pageTablesArray;
+unsigned int offset;
+
+int** pageTablesArray;
+long double* pageFaults;
+long double* pageOuts;
+long double* pageHits;
 
 char* evictionPolicy;
 
@@ -29,4 +35,3 @@ DLLElement* TLBEnd;
 
 DLLElement* VM;
 DLLElement* VMEnd;
-
