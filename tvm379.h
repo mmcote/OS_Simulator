@@ -16,7 +16,8 @@ int** pageTablesArray;
 unsigned int* pageFaults;
 unsigned int* pageOuts;
 unsigned int* pageHits;
-
+unsigned int* currentVMDistribution;
+unsigned int* currentAverages;
 char* evictionPolicy;
 
 typedef struct DLLElement

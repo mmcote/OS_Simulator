@@ -1,84 +1,4 @@
-#include "simulator.h"
-
-/* reverse bit order of unsigned int
-http://stackoverflow.com/questions/9144800/c-reverse-bits-in-unsigned-integer
-*/
-unsigned int reverse(unsigned int x)
-{
-    x = ((x >> 1) & 0x55555555u) | ((x & 0x55555555u) << 1);
-    x = ((x >> 2) & 0x33333333u) | ((x & 0x33333333u) << 2);
-    x = ((x >> 4) & 0x0f0f0f0fu) | ((x & 0x0f0f0f0fu) << 4);
-    x = ((x >> 8) & 0x00ff00ffu) | ((x & 0x00ff00ffu) << 8);
-    x = ((x >> 16) & 0xffffu) | ((x & 0xffffu) << 16);
-    return x;
-}
-
-void printBinary(unsigned int num)
-{
-    unsigned int copy;
-    unsigned int shiftedVal;
-    int i = 0;
-    for (; i < 32; ++i)
-    {
-        copy = num;
-        // Left shift
-        copy = copy << i;
-        // Right shift
-        copy = copy >> 31;
-        
-        if (copy == 1)
-        {
-            printf("1");
-        }
-        else
-        {
-            printf("0");
-        }
-    }
-    printf("\n");
-}
-
-// Print the Doubly Linked List from the start
-void printDLL(DLLElement* head)
-{
-    DLLElement* cursor = head;
-    while(cursor != NULL)
-    {
-        printf("Page Number: %u, PID: %u, Frame Number: %u\n", cursor->pageNum, cursor->PID, cursor->frameNum);
-        cursor = cursor->next;
-    }
-}
-
-void printDLLSize(DLLElement* head)
-{
-    DLLElement* cursor = head;
-    unsigned int i = 0;
-    while (cursor != NULL)
-    {
-        ++i;
-        cursor = cursor->next;
-    }
-    printf("Size of the DLL: %u\n", i);
-}
-
-// Print the Doubly Linked List from the end up
-void printDLLBackwards(DLLElement* head)
-{
-    DLLElement* cursor = head;
-    while(cursor != NULL)
-    {
-        if (cursor->next == NULL)
-        {
-            break;
-        }
-        cursor = cursor->next;
-    }
-    while(cursor != NULL)
-    {
-        printf("Page Number: %d\n", cursor->pageNum);
-        cursor = cursor->prev;
-    }
-}
+#include "tvm379.h"
 
 void markValidity(DLLElement* DLL, unsigned int pageNum, unsigned int frameNum, unsigned int PID, unsigned int validity)
 {
@@ -472,10 +392,6 @@ DLLElement* addToDLL(DLLElement* DLL, DLLElement** DLLEnd, unsigned int pageNum,
         we just remove
         */
         *DLLEnd = removeBack(*DLLEnd);
-        // if ((*DLLEnd)->PID == 1)
-        // {
-        //     printf("*DLLEnd->PID: %u\n", (*DLLEnd)->PID);
-        // }
         *currentSize -= 1;
     }
 
@@ -573,10 +489,6 @@ void processQuantum(unsigned char* buffer, int quantum, unsigned int PID, DLLEle
 
         int pageTableHit = -1;
         pageTableHit = pageTablesArray[PID][pageNum];
-        if (PID == 1)
-        {
-            // printf("pageTableHit: %u\n", pageTableHit);
-        }
         if (pageTableHit != -1)
         {
             addToPT = 0;
@@ -589,10 +501,6 @@ void processQuantum(unsigned char* buffer, int quantum, unsigned int PID, DLLEle
             {
                 VM = VMMakeMostRecent(VM, &VMEnd, frames, pageTableHit);
             }
-        }
-        else
-        {
-            pageFaultsForQuantum += 1;
         }
 
         // Here we will be adding to the VM
@@ -609,6 +517,8 @@ void processQuantum(unsigned char* buffer, int quantum, unsigned int PID, DLLEle
                 evicted, then evict
                 */
                 frameNum = VMEnd->frameNum;  
+                currentVMDistribution[VMEnd->PID] += 1;
+
                 // printf("VMEnd->pageNum: %u, VMEnd->PID: %u, VMEnd->frameNum: %u\n", VMEnd->pageNum, VMEnd->PID, VMEnd->frameNum);
                 // Mark pageout for process
                 pageOutsForQuantum[VMEnd->PID] += 1;
@@ -626,6 +536,8 @@ void processQuantum(unsigned char* buffer, int quantum, unsigned int PID, DLLEle
 
             // Only when we add to the VM do we set the frames[frameNum] pointer
             VM = addToDLL(VM, &VMEnd, pageNum, frameNum, PID, &currentVMSize, maxVMSize);
+            pageFaultsForQuantum += 1;
+            currentVMDistribution[PID] += 1;
 
             // Only when we change an element in the VM do we update the frame
             frames[frameNum] = VM;
@@ -645,11 +557,7 @@ void processQuantum(unsigned char* buffer, int quantum, unsigned int PID, DLLEle
         // Last step is always adding it to the VM
         TLB = addToDLL(TLB, &TLBEnd, pageNum, frameNum, PID, &currentTLBSize, maxTLBSize);
     }
-    // printf("HitsInside: %u\n", hits);
-    // printf("Hit/Checks %d/%d\n", hits, checks);
-    // printf("pageFaultsForQuantum: %u\n", pageFaultsForQuantum);
-    // printf("pageFaultsForQuantum: %u\n", pageFaultsForQuantum);
-    
+
     int p = 0;
     for (; p < numTraceFiles; p++)
     {
@@ -659,65 +567,6 @@ void processQuantum(unsigned char* buffer, int quantum, unsigned int PID, DLLEle
     pageFaults[PID] += pageFaultsForQuantum;
     pageHits[PID] += hits;
     return;
-}
-
-void demoTLB()
-{
-    unsigned int current = 0;
-    DLLElement* end = malloc(sizeof(DLLElement));
-    DLLElement* head = NULL;
-    head = addToDLL(head, &end, 10, 1, 1, &current, 30);
-    head = addToDLL(head, &end, 9, 1, 1, &current, 30);
-    head = addToDLL(head, &end, 8, 1, 1, &current, 30);
-    head = makeMostRecent(head, &end, 10, 1);
-    head = addToDLL(head, &end, 7, 1, 1, &current, 30);
-    head = addToDLL(head, &end, 6, 1, 1, &current, 30);
-    head = addToDLL(head, &end, 5, 1, 1, &current, 30);
-    head = addToDLL(head, &end, 4, 1, 1, &current, 30);
-    head = addToDLL(head, &end, 3, 1, 1, &current, 30);
-    head = makeMostRecent(head, &end, 5, 1);
-    head = addToDLL(head, &end, 2, 1, 1, &current, 30);
-    head = makeMostRecent(head, &end, 9, 1);
-    head = addToDLL(head, &end, 1, 1, 1, &current, 30);
-    head = addToDLL(head, &end, 6, 1, 1, &current, 30);
-    head = addToDLL(head, &end, 5, 1, 1, &current, 30);
-    head = addToDLL(head, &end, 4, 1, 1, &current, 30);
-    head = addToDLL(head, &end, 3, 1, 1, &current, 30);
-
-    printDLL(head);
-    printf("-------------------\n");
-    printDLLBackwards(end);
-}
-
-void demoMostRecentWithElementTLB()
-{
-    unsigned int current = 0;
-    DLLElement* end = malloc(sizeof(DLLElement));
-    DLLElement* head = NULL;
-    head = addToDLL(head, &end, 10, 1, 1, &current, 30);
-    head = addToDLL(head, &end, 9, 1, 1, &current, 30);
-    head = addToDLL(head, &end, 8, 1, 1, &current, 30);
-    DLLElement* recent = TLBHitOrMiss(8, 1, head);
-    head = makeMostRecentGivenElement(head, &end, recent);
-    head = addToDLL(head, &end, 7, 1, 1, &current, 30);
-    head = addToDLL(head, &end, 6, 1, 1, &current, 30);
-    head = addToDLL(head, &end, 5, 1, 1, &current, 30);
-    head = addToDLL(head, &end, 4, 1, 1, &current, 30);
-    head = addToDLL(head, &end, 3, 1, 1, &current, 30);
-    recent = TLBHitOrMiss(5, 1, head);
-    head = makeMostRecentGivenElement(head, &end, recent);
-    head = addToDLL(head, &end, 2, 1, 1, &current, 30);
-    recent = TLBHitOrMiss(9, 1, head);
-    head = makeMostRecentGivenElement(head, &end, recent);
-    head = addToDLL(head, &end, 1, 1, 1, &current, 30);
-    head = addToDLL(head, &end, 6, 1, 1, &current, 30);
-    head = addToDLL(head, &end, 5, 1, 1, &current, 30);
-    head = addToDLL(head, &end, 4, 1, 1, &current, 30);
-    head = addToDLL(head, &end, 3, 1, 1, &current, 30);
-
-    printDLL(head);
-    printf("-------------------\n");
-    printDLLBackwards(end);
 }
 
 int main(int argc, char **argv)
@@ -818,6 +667,8 @@ int main(int argc, char **argv)
     pageFaults = malloc(numTraceFiles*sizeof(unsigned int));
     pageOuts = malloc(numTraceFiles*sizeof(unsigned int));
     pageHits = malloc(numTraceFiles*sizeof(unsigned int));
+    currentVMDistribution = malloc(numTraceFiles*sizeof(unsigned int));
+    currentAverages = malloc(numTraceFiles*sizeof(unsigned int));
 
     FILE** fp[numTraceFiles];
     unsigned int filesize[numTraceFiles];
@@ -836,6 +687,9 @@ int main(int argc, char **argv)
         pageFaults[a] = 0;
         pageOuts[a] = 0;
         pageHits[a] = 0;
+
+        currentVMDistribution[a] = 0;
+        currentAverages[a] = 0;
     }
 
     // Initialize the TLB
@@ -898,6 +752,11 @@ int main(int argc, char **argv)
             }
             tillEndCount[index] += 1;
             totalEndCount += 1;
+            int k = 0;
+            for (k = 0; k < numTraceFiles; ++k)
+            {
+                currentAverages[k] += currentVMDistribution[k];
+            }
         }
 
         bzero(buffer, quantum*4);
@@ -914,19 +773,16 @@ int main(int argc, char **argv)
         }
         index++;
     }
-    long double average;
+    long double average = 0;
     long double difference;
     // Print the stats of the simulation
     int m = 0;
     for (; m < numTraceFiles; m++)
     {
-        difference = pageFaults[m] - pageOuts[m];
-        average = difference / tillEndCount[m];
-        // average = difference*(difference/(1.0/(difference/tillEndCount[m])));
-        // average = 
-        printf("Total %LF\n", totalEndCount);
+        // difference = pageFaults[m] - pageOuts[m];
+        // average = currentAverages[m] / totalEndCount;
         // average = average / totalQuantumCount;
-        printf("TLBHits: %u, PageFaults: %u, PageOuts: %u, Averages: %LF, Count: %LF\n", pageHits[m], pageFaults[m], pageOuts[m], average, tillEndCount[m]);
+        printf("%u %u %u %LF\n", pageHits[m], pageFaults[m], pageOuts[m], average);
     }
 
     return 0;
